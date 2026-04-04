@@ -13,6 +13,7 @@ const FAVICON_CANDIDATES = [
   "public/favicon.svg",
   "public/favicon.ico",
   "public/favicon.png",
+  "web/public/favicon.svg",
   "app/favicon.ico",
   "app/favicon.png",
   "app/icon.svg",
