@@ -57,6 +57,7 @@
             nixfmt
             nodejs_24
             nushell
+            python3
             # keep-sorted end
             bun2nixCli
           ];
