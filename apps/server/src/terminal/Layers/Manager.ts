@@ -30,6 +30,10 @@ import {
 } from "../../observability/Metrics.ts";
 import { runProcess } from "../../processRunner.ts";
 import {
+  ProjectRuntimeEnvironment,
+  type ProjectRuntimeEnvironmentShape,
+} from "../../project/Services/ProjectRuntimeEnvironment.ts";
+import {
   TerminalCwdError,
   TerminalHistoryError,
   TerminalManager,
@@ -693,6 +697,7 @@ interface TerminalManagerOptions {
   logsDir: string;
   historyLineLimit?: number;
   ptyAdapter: PtyAdapterShape;
+  projectRuntimeEnvironment?: ProjectRuntimeEnvironmentShape;
   shellResolver?: () => string;
   platform?: NodeJS.Platform;
   env?: NodeJS.ProcessEnv;
@@ -705,9 +710,11 @@ interface TerminalManagerOptions {
 const makeTerminalManager = Effect.fn("makeTerminalManager")(function* () {
   const { terminalLogsDir } = yield* ServerConfig;
   const ptyAdapter = yield* PtyAdapter;
+  const projectRuntimeEnvironment = yield* ProjectRuntimeEnvironment;
   return yield* makeTerminalManagerWithOptions({
     logsDir: terminalLogsDir,
     ptyAdapter,
+    projectRuntimeEnvironment,
   });
 });
 
@@ -722,6 +729,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
     const platform = options.platform ?? process.platform;
     const baseEnv = options.env ?? process.env;
     const shellResolver = options.shellResolver ?? (() => defaultShellResolver(platform, baseEnv));
+    const projectRuntimeEnvironment = options.projectRuntimeEnvironment;
     const subprocessChecker = options.subprocessChecker ?? defaultSubprocessChecker;
     const subprocessPollIntervalMs =
       options.subprocessPollIntervalMs ?? DEFAULT_SUBPROCESS_POLL_INTERVAL_MS;
@@ -1088,6 +1096,33 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
           reason: "notDirectory",
         });
       }
+    });
+
+    const resolveRuntimeEnv = Effect.fn("terminal.resolveRuntimeEnv")(function* (input: {
+      readonly threadId: string;
+      readonly terminalId: string;
+      readonly cwd: string;
+      readonly env?: Record<string, string>;
+    }) {
+      const resolvedEnvironment = projectRuntimeEnvironment
+        ? yield* projectRuntimeEnvironment.resolveForCwd(input.cwd)
+        : undefined;
+      if (resolvedEnvironment?.warning) {
+        yield* Effect.logWarning("terminal falling back to ambient project environment", {
+          threadId: input.threadId,
+          terminalId: input.terminalId,
+          cwd: input.cwd,
+          rcPath: resolvedEnvironment.rcPath ?? null,
+          warning: resolvedEnvironment.warning,
+          autoAllowedWorktree: resolvedEnvironment.autoAllowedWorktree === true,
+          usedFallback: true,
+        });
+      }
+
+      return normalizedRuntimeEnv({
+        ...toRuntimeEnvRecord(resolvedEnvironment?.env ?? baseEnv),
+        ...input.env,
+      });
     });
 
     const getSession = Effect.fn("terminal.getSession")(function* (
@@ -1624,6 +1659,12 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
 
           const sessionKey = toSessionKey(input.threadId, terminalId);
           const existing = yield* getSession(input.threadId, terminalId);
+          const nextRuntimeEnv = yield* resolveRuntimeEnv({
+            threadId: input.threadId,
+            terminalId,
+            cwd: input.cwd,
+            ...(input.env ? { env: input.env } : {}),
+          });
           if (Option.isNone(existing)) {
             yield* flushPersist(input.threadId, terminalId);
             const history = yield* readHistory(input.threadId, terminalId);
@@ -1650,7 +1691,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               unsubscribeData: null,
               unsubscribeExit: null,
               hasRunningSubprocess: false,
-              runtimeEnv: normalizedRuntimeEnv(input.env),
+              runtimeEnv: nextRuntimeEnv,
             };
 
             const createdSession = session;
@@ -1678,7 +1719,6 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
           }
 
           const liveSession = existing.value;
-          const nextRuntimeEnv = normalizedRuntimeEnv(input.env);
           const currentRuntimeEnv = liveSession.runtimeEnv;
           const targetCols = input.cols ?? liveSession.cols;
           const targetRows = input.rows ?? liveSession.rows;
@@ -1808,6 +1848,12 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
           if (Option.isNone(existingSession)) {
             const cols = input.cols ?? DEFAULT_OPEN_COLS;
             const rows = input.rows ?? DEFAULT_OPEN_ROWS;
+            const runtimeEnv = yield* resolveRuntimeEnv({
+              threadId: input.threadId,
+              terminalId,
+              cwd: input.cwd,
+              ...(input.env ? { env: input.env } : {}),
+            });
             session = {
               threadId: input.threadId,
               terminalId,
@@ -1829,7 +1875,7 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
               unsubscribeData: null,
               unsubscribeExit: null,
               hasRunningSubprocess: false,
-              runtimeEnv: normalizedRuntimeEnv(input.env),
+              runtimeEnv,
             };
             const createdSession = session;
             yield* modifyManagerState((state) => {
@@ -1840,10 +1886,16 @@ export const makeTerminalManagerWithOptions = Effect.fn("makeTerminalManagerWith
             yield* evictInactiveSessionsIfNeeded();
           } else {
             session = existingSession.value;
+            const runtimeEnv = yield* resolveRuntimeEnv({
+              threadId: input.threadId,
+              terminalId,
+              cwd: input.cwd,
+              ...(input.env ? { env: input.env } : {}),
+            });
             yield* stopProcess(session);
             session.cwd = input.cwd;
             session.worktreePath = input.worktreePath ?? null;
-            session.runtimeEnv = normalizedRuntimeEnv(input.env);
+            session.runtimeEnv = runtimeEnv;
           }
 
           const cols = input.cols ?? session.cols;

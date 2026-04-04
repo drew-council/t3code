@@ -24,7 +24,7 @@ import {
   ThreadId,
   ProviderSendTurnInput,
 } from "@t3tools/contracts";
-import { Effect, Exit, Fiber, FileSystem, Queue, Schema, Scope, Stream } from "effect";
+import { Effect, Exit, Fiber, FileSystem, Option, Queue, Schema, Scope, Stream } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 import * as CodexErrors from "effect-codex-app-server/errors";
 import * as EffectCodexSchema from "effect-codex-app-server/schema";
@@ -45,6 +45,7 @@ import {
 import { type CodexAdapterShape } from "../Services/CodexAdapter.ts";
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { ServerConfig } from "../../config.ts";
+import { ProjectRuntimeEnvironment } from "../../project/Services/ProjectRuntimeEnvironment.ts";
 import {
   CodexResumeCursorSchema,
   CodexSessionRuntimeThreadIdMissingError,
@@ -1350,6 +1351,7 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
     options?.nativeEventLogger === undefined ? nativeEventLogger : undefined;
   const runtimeEventQueue = yield* Queue.unbounded<ProviderRuntimeEvent>();
   const sessions = new Map<ThreadId, CodexAdapterSessionContext>();
+  const projectRuntimeEnvironment = yield* Effect.serviceOption(ProjectRuntimeEnvironment);
 
   const startSession: CodexAdapterShape["startSession"] = (input) =>
     Effect.scoped(
@@ -1367,12 +1369,29 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
           yield* Effect.suspend(() => stopSessionInternal(existing));
         }
 
+        const resolvedEnvironment =
+          input.cwd && Option.isSome(projectRuntimeEnvironment)
+            ? yield* projectRuntimeEnvironment.value.resolveForCwd(input.cwd)
+            : undefined;
+        if (resolvedEnvironment?.warning) {
+          yield* Effect.logWarning("codex session falling back to ambient project environment", {
+            threadId: input.threadId,
+            cwd: input.cwd,
+            rcPath: resolvedEnvironment.rcPath ?? null,
+            warning: resolvedEnvironment.warning,
+            autoAllowedWorktree: resolvedEnvironment.autoAllowedWorktree === true,
+            usedFallback: true,
+          });
+        }
+
         const runtimeInput: CodexSessionRuntimeOptions = {
           threadId: input.threadId,
           providerInstanceId: boundInstanceId,
           cwd: input.cwd ?? process.cwd(),
           binaryPath: codexConfig.binaryPath,
-          ...(options?.environment ? { environment: options.environment } : {}),
+          ...(resolvedEnvironment || options?.environment
+            ? { environment: { ...(options?.environment ?? process.env), ...(resolvedEnvironment?.env ?? {}) } }
+            : {}),
           ...(codexConfig.homePath ? { homePath: codexConfig.homePath } : {}),
           ...(Schema.is(CodexResumeCursorSchema)(input.resumeCursor)
             ? { resumeCursor: input.resumeCursor }

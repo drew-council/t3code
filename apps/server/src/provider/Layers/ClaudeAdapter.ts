@@ -59,6 +59,7 @@ import {
   Exit,
   FileSystem,
   Fiber,
+  Option,
   Path,
   Queue,
   Random,
@@ -68,6 +69,7 @@ import {
 
 import { resolveAttachmentPath } from "../../attachmentStore.ts";
 import { ServerConfig } from "../../config.ts";
+import { ProjectRuntimeEnvironment } from "../../project/Services/ProjectRuntimeEnvironment.ts";
 import { makeClaudeEnvironment } from "../Drivers/ClaudeHome.ts";
 import {
   getClaudeModelCapabilities,
@@ -1004,6 +1006,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
 
   const sessions = new Map<ThreadId, ClaudeSessionContext>();
   const runtimeEventQueue = yield* Queue.unbounded<ProviderRuntimeEvent>();
+  const projectRuntimeEnvironment = yield* Effect.serviceOption(ProjectRuntimeEnvironment);
 
   const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
   const nextEventId = Effect.map(Random.nextUUIDv4, (id) => EventId.make(id));
@@ -2840,6 +2843,20 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
 
       const claudeBinaryPath = claudeSettings.binaryPath;
       const extraArgs = parseCliArgs(claudeSettings.launchArgs).flags;
+      const resolvedEnvironment =
+        input.cwd && Option.isSome(projectRuntimeEnvironment)
+          ? yield* projectRuntimeEnvironment.value.resolveForCwd(input.cwd)
+          : undefined;
+      if (resolvedEnvironment?.warning) {
+        yield* Effect.logWarning("claude session falling back to ambient project environment", {
+          threadId: input.threadId,
+          cwd: input.cwd,
+          rcPath: resolvedEnvironment.rcPath ?? null,
+          warning: resolvedEnvironment.warning,
+          autoAllowedWorktree: resolvedEnvironment.autoAllowedWorktree === true,
+          usedFallback: true,
+        });
+      }
       const modelSelection =
         input.modelSelection?.instanceId === boundInstanceId ? input.modelSelection : undefined;
       const caps = getClaudeModelCapabilities(modelSelection?.model);
@@ -2891,7 +2908,7 @@ export const makeClaudeAdapter = Effect.fn("makeClaudeAdapter")(function* (
         ...(newSessionId ? { sessionId: newSessionId } : {}),
         includePartialMessages: true,
         canUseTool,
-        env: claudeEnvironment,
+        env: { ...claudeEnvironment, ...(resolvedEnvironment?.env ?? {}) },
         ...(input.cwd ? { additionalDirectories: [input.cwd] } : {}),
         ...(Object.keys(extraArgs).length > 0 ? { extraArgs } : {}),
       };
