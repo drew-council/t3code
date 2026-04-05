@@ -1,0 +1,76 @@
+name: Upstream Release Rebase
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Optional upstream release tag to sync to, for example v0.0.15"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: upstream-release-rebase-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Rebase main onto latest upstream stable release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - name: Inspect current sync state
+        run: |
+          node scripts/upstream-release-rebase.ts inspect | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Sync fork with upstream release
+        run: |
+          set -euo pipefail
+          if [[ -n "${{ inputs.tag }}" ]]; then
+            node scripts/upstream-release-rebase.ts sync --tag "${{ inputs.tag }}" --push
+          else
+            node scripts/upstream-release-rebase.ts sync --push
+          fi
+
+      - name: Inspect final sync state
+        if: success()
+        run: |
+          printf '\n## Final state\n\n' >> "$GITHUB_STEP_SUMMARY"
+          node scripts/upstream-release-rebase.ts inspect | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect failure diagnostics
+        if: failure()
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/upstream-release-rebase
+          git status --short > .artifacts/upstream-release-rebase/git-status.txt || true
+          git diff --name-only --diff-filter=U > .artifacts/upstream-release-rebase/conflicts.txt || true
+          cp .git/t3code/upstream-release-rebase.json .artifacts/upstream-release-rebase/metadata.json || true
+          node scripts/upstream-release-rebase.ts inspect > .artifacts/upstream-release-rebase/inspect.txt || true
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: upstream-release-rebase-diagnostics
+          path: .artifacts/upstream-release-rebase/*
+          if-no-files-found: warn
