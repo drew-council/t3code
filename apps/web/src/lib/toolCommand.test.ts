@@ -21,6 +21,14 @@ describe("normalizeCommandValue", () => {
     ).toBe('sed -n \\"1,220p\\" apps/server/src/project/Layers/ProjectFaviconResolver.ts');
   });
 
+  it("unwraps prefixed shell launcher strings", () => {
+    expect(
+      normalizeCommandValue(
+        "Command: /run/current-system/sw/bin/zsh -lc \"sed -n '920,1080p' apps/server/src/provider/Layers/ProviderService.test.ts\"",
+      ),
+    ).toBe("sed -n '920,1080p' apps/server/src/provider/Layers/ProviderService.test.ts");
+  });
+
   it("keeps direct shell commands that are not launcher wrappers", () => {
     expect(normalizeCommandValue(["bash", "scripts/setup-dev.sh"])).toBe(
       "bash scripts/setup-dev.sh",

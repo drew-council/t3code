@@ -120,10 +120,14 @@ function formatCommandArrayPart(value: string): string {
   return /[\s"'`]/.test(value) ? `"${value.replace(/"/g, '\\"')}"` : value;
 }
 
+function stripLeadingCommandPrefix(value: string): string {
+  return value.replace(/^command:\s*/i, "");
+}
+
 function formatCommandValue(value: unknown): string | null {
   const direct = asTrimmedString(value);
   if (direct) {
-    return direct;
+    return stripLeadingCommandPrefix(direct);
   }
   if (!Array.isArray(value)) {
     return null;

@@ -1,5 +1,6 @@
 node_modules
 .bun
+.codex
 .direnv/
 .turbo
 .DS_Store
