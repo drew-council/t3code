@@ -57,7 +57,7 @@ let
 
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-D/l9v4onFbfzlbujMINxSsojMJAlt/4pfy9onQB6two=";
+    outputHash = "sha256-QSq94Bl/VgAUZHXo/F4Zw/6OU6QTuGQZGfeXP+hwVHQ=";
 
     nativeBuildInputs = [
       bun2nix.hook
@@ -154,9 +154,7 @@ stdenv.mkDerivation {
     cp -R apps/marketing "$app_root/apps/"
     cp -R apps/server/dist "$app_root/apps/server/"
     cp -R apps/web "$app_root/apps/"
-    cp -R packages/client-runtime "$app_root/packages/"
-    cp -R packages/contracts "$app_root/packages/"
-    cp -R packages/shared "$app_root/packages/"
+    cp -R packages/. "$app_root/packages/"
     cp -R scripts "$app_root/"
     cp -R node_modules "$app_root/"
 
