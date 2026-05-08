@@ -1393,7 +1393,7 @@ export const makeCodexAdapter = Effect.fn("makeCodexAdapter")(function* (
             ? {
                 environment: {
                   ...(options?.environment ?? process.env),
-                  ...(resolvedEnvironment?.env ?? {}),
+                  ...resolvedEnvironment?.env,
                 },
               }
             : {}),
