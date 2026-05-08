@@ -162,7 +162,7 @@ stdenv.mkDerivation {
     {
       "name": "t3code",
       "version": "${version}",
-      "main": "apps/desktop/dist-electron/main.js",
+      "main": "apps/desktop/dist-electron/main.cjs",
       "t3codeCommitHash": "${normalizedRevision}"
     }
     EOF
