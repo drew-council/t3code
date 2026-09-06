@@ -13,7 +13,7 @@ In your system `flake.nix`, add a `t3code` input:
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    t3code.url = "github:bizmythy/t3code";
+    t3code.url = "github:drew-council/t3code";
   };
 }
 ```
