@@ -10,9 +10,11 @@ import {
   type ThreadPullRequestStack,
 } from "@t3tools/contracts";
 import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
+import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
 import {
   threadPullRequestKeyOf,
   normalizeThreadPullRequestKey,
+  resolveThreadPullRequestChains,
   threadPullRequestKeysEqual,
   visibleThreadPullRequests,
 } from "../sourceControl/threadPullRequests.ts";
@@ -34,6 +36,7 @@ import * as GitManager from "../git/GitManager.ts";
 import { PullRequestProviderError } from "@t3tools/source-control-core/server/PullRequestProvider";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import { forkParked } from "../serverActivation.ts";
+import * as ServerSettings from "../serverSettings.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 import * as ProjectionStore from "./ProjectionStore.ts";
 import { isTerminalRunStatus } from "./ThreadManagementService.ts";
@@ -317,6 +320,9 @@ export const make = Effect.gen(function* () {
   const pullRequests = yield* PullRequestService.PullRequestService;
   const git = yield* GitManager.GitManager;
   const crypto = yield* Crypto.Crypto;
+  const serverSettings = yield* ServerSettings.ServerSettingsService;
+  // Chains already sent to the host, so a rejected request is not repeated every sweep.
+  const registeredChains = new Set<string>();
 
   const lastSyncedAt = new Map<string, number>();
   const requested = new Set<string>();
@@ -358,6 +364,52 @@ export const make = Effect.gen(function* () {
     (message: string, fields: Record<string, unknown>) =>
     <E>(cause: Cause.Cause<E>): Effect.Effect<void, E> =>
       Cause.hasInterruptsOnly(cause) ? Effect.failCause(cause) : Effect.logWarning(message, fields);
+
+  // Reviewers only see a stack on the host once it is registered there, as `gh stack link` does.
+  const registerChains = Effect.fn("PullRequestSyncReactor.registerChains")(function* (
+    threads: ReadonlyArray<ProjectionStore.ProjectionThreadPullRequests>,
+  ) {
+    const settings = yield* serverSettings.getSettings;
+    for (const thread of threads) {
+      if (!isUnsettled(thread)) continue;
+      const { registerPullRequestChainsAsStacks } = resolveProjectSettings(
+        settings,
+        thread.projectId,
+      ).settings;
+      if (!registerPullRequestChainsAsStacks) continue;
+      for (const chain of resolveThreadPullRequestChains(thread.pullRequests ?? [])) {
+        // Only a straight line of open, unstacked layers maps onto one stack.
+        if (chain.kind !== "derived" || chain.layers.length < 2) continue;
+        if (chain.depths.some((depth, index) => depth !== index)) continue;
+        if (chain.layers.some((link) => link.stack !== null || link.snapshot?.state !== "open")) {
+          continue;
+        }
+        const keys = chain.layers.map(
+          (link) => `${thread.projectId}\0${threadPullRequestKeyOf(link)}`,
+        );
+        if (keys.some((key) => retryStacks.has(key))) continue;
+        const chainKey = keys.join(",");
+        if (registeredChains.has(chainKey)) continue;
+        registeredChains.add(chainKey);
+        const { host, repository } = normalizeThreadPullRequestKey(chain.layers[0]!);
+        yield* pullRequests
+          .createStack({
+            projectId: thread.projectId,
+            host,
+            repository,
+            numbers: chain.layers.map((link) => link.number),
+          })
+          .pipe(
+            Effect.andThen(Effect.forEach(chain.layers, requestSync, { discard: true })),
+            Effect.catchCause(
+              logSkipped("registering a pull request chain as a stack failed", {
+                threadId: thread.id,
+              }),
+            ),
+          );
+      }
+    }
+  });
 
   const sweep = Effect.fn("PullRequestSyncReactor.sweep")(function* (scope: "all" | "requested") {
     const threads = yield* projections.getThreadsWithPullRequests();
@@ -594,6 +646,9 @@ export const make = Effect.gen(function* () {
     for (const [reason, { count, key }] of skips) {
       yield* Effect.logWarning("pull request sync skipped", { count, key, reason });
     }
+    yield* registerChains(threads).pipe(
+      Effect.catchCause(logSkipped("pull request chain registration skipped", {})),
+    );
   });
 
   const worker = yield* makeDrainableWorker((scope: "all" | "requested") =>

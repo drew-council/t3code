@@ -326,3 +326,10 @@ the scope and merge strategy. GitHub rebases the remaining stack after merging.
 It can rewrite history and restart checks. If a layer fails, earlier updates remain; resolve that
 layer before retrying. GitHub may require manual conflict resolution after a lower layer is amended,
 even when its changes look independent. Stack actions require an environment that supports them.
+
+A worktree thread follows the branch you check out, so moving between layers with `gh stack` keeps
+its pull request current after each turn. When the checked-out branch's pull request is in a GitHub
+stack and the thread has no linked reviews yet, it links that pull request, and the rest of the
+stack links with it. To show a chain of linked pull requests as a stack on GitHub, turn on
+**Register pull request chains as stacks** in Settings → Source control. It applies to a straight
+chain of open pull requests that are not in a stack yet.

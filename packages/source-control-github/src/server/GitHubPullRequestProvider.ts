@@ -435,6 +435,9 @@ export const make = Effect.gen(function* () {
     getChangeRequestStack: (input) =>
       cli.getPullRequestStack(input).pipe(Effect.mapError(fail("getChangeRequestStack"))),
 
+    createChangeRequestStack: (input) =>
+      cli.createPullRequestStack(input).pipe(Effect.mapError(fail("createChangeRequestStack"))),
+
     getChangeRequestWatchFingerprint: (input) =>
       cli
         .getPullRequestWatchFingerprint(input)

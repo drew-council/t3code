@@ -90,6 +90,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
   const mixedWorkspace = useScopedSettingsMixed(["defaultThreadEnvMode"]);
   const mixedAutoPull = useScopedSettingsMixed(["defaultAutoPull"]);
   const mixedAgentCredits = useScopedSettingsMixed(["removeAgentCreditsOnMerge"]);
+  const mixedChainStacks = useScopedSettingsMixed(["registerPullRequestChainsAsStacks"]);
   const mixedMergeMethod = useScopedSettingsMixed(["pullRequestMergeMethod"]);
   const modelSource = useScopedSettingSource(["defaultModelSelection"]);
   const isProjectScope = scope.kind === "project" || scope.kind === "checkout";
@@ -408,6 +409,32 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                 checked={mixedAgentCredits ? false : settings.removeAgentCreditsOnMerge}
                 onCheckedChange={(enabled) =>
                   updateSettings({ removeAgentCreditsOnMerge: enabled })
+                }
+              />
+            }
+          />
+          <SettingsRow
+            serverScoped
+            settingKeys={["registerPullRequestChainsAsStacks"]}
+            mixed={mixedChainStacks}
+            {...searchableSetting("register-pull-request-chains-as-stacks")}
+            description="Register a chain of linked pull requests, each based on the one below it, as a stack on hosts that support stacks, so reviewers see it there. Adds only; existing stacks are left alone."
+            resetAction={
+              settings.registerPullRequestChainsAsStacks ? (
+                <SettingResetButton
+                  label="stack registration"
+                  tooltip="Leave chains unstacked"
+                  onClick={() => updateSettings({ registerPullRequestChainsAsStacks: false })}
+                />
+              ) : null
+            }
+            control={
+              <Switch
+                aria-label="Register pull request chains as stacks"
+                mixed={mixedChainStacks}
+                checked={mixedChainStacks ? false : settings.registerPullRequestChainsAsStacks}
+                onCheckedChange={(enabled) =>
+                  updateSettings({ registerPullRequestChainsAsStacks: enabled })
                 }
               />
             }
