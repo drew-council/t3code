@@ -174,6 +174,9 @@ function preparationErrorMessage(error: unknown): string {
   if (errorCode(error) === "unsupported-locale") {
     return "Voice transcription is not available for this language.";
   }
+  if (error instanceof VoiceTranscriptionError && error.code === "preparation-failed") {
+    return error.message;
+  }
   return "Could not prepare voice transcription.";
 }
 

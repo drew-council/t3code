@@ -9,6 +9,7 @@ import {
 } from "@t3tools/client-runtime/voice-input";
 
 import { getClientSettings } from "~/hooks/useSettings";
+import { forgetOnePasswordSecret, resolveSecretSetting } from "~/lib/onePasswordSecrets";
 
 const OPENAI_TRANSCRIPTION_URL = "https://api.openai.com/v1/audio/transcriptions";
 const OPENAI_TRANSCRIPTION_MODEL = "gpt-transcribe";
@@ -106,6 +107,7 @@ function openAiErrorMessage(body: unknown, status: number): string {
 
 async function transcribeRecording(
   apiKey: string,
+  keySetting: string,
   uri: string,
   signal: AbortSignal,
 ): Promise<string> {
@@ -133,6 +135,7 @@ async function transcribeRecording(
     });
   }
   if (!response.ok) {
+    if (response.status === 401) forgetOnePasswordSecret(keySetting);
     throw new VoiceTranscriptionError(
       "transcription-failed",
       openAiErrorMessage(body, response.status),
@@ -142,13 +145,25 @@ async function transcribeRecording(
   return typeof body.text === "string" ? body.text : "";
 }
 
-function openAiTranscriber(apiKey: string): VoiceTranscriber {
+function openAiTranscriber(keySetting: string): VoiceTranscriber {
   return {
     prepare: async ({ signal }) => {
+      let apiKey: string | null;
+      try {
+        apiKey = await resolveSecretSetting(keySetting);
+      } catch (cause) {
+        throwIfVoiceTranscriptionAborted(signal);
+        const detail = cause instanceof Error ? cause.message : String(cause);
+        throw new VoiceTranscriptionError("preparation-failed", detail, { cause });
+      }
       throwIfVoiceTranscriptionAborted(signal);
+      if (!apiKey) {
+        throw new VoiceTranscriptionError("preparation-failed", "The OpenAI API key is empty.");
+      }
+      const key = apiKey;
       return {
         locale: navigator.language,
-        transcribe: (uri, options) => transcribeRecording(apiKey, uri, options.signal),
+        transcribe: (uri, options) => transcribeRecording(key, keySetting, uri, options.signal),
       };
     },
   };
@@ -188,8 +203,8 @@ export function createOpenAiVoiceInputController(input: {
   const controller: VoiceInputController = new VoiceInputController({
     recorder,
     getTranscriber: () => {
-      const apiKey = getClientSettings().openaiTranscriptionApiKey.trim();
-      return apiKey ? openAiTranscriber(apiKey) : null;
+      const keySetting = getClientSettings().openaiTranscriptionApiKey.trim();
+      return keySetting ? openAiTranscriber(keySetting) : null;
     },
     requestPermission: requestMicrophonePermission,
     configureRecording: () => recorder.acquireMicrophone(),

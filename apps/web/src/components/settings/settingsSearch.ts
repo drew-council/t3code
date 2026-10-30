@@ -675,6 +675,18 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["ask before thread chat history"],
   },
   {
+    id: "one-password-account",
+    title: "1Password account",
+    to: "/settings/general",
+    searchTerms: ["1password op secret reference account vault"],
+  },
+  {
+    id: "one-password-cached-secrets",
+    title: "Cached 1Password secrets",
+    to: "/settings/general",
+    searchTerms: ["1password op secret clear cache rotate forget"],
+  },
+  {
     id: "terminal-close-confirmation",
     title: "Terminal close confirmation",
     to: "/settings/general",
