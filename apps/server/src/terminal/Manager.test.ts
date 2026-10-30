@@ -220,6 +220,7 @@ const historyLogPath = (logsDir: string, threadId = "thread-1") =>
 
 interface CreateManagerOptions {
   shellResolver?: () => string;
+  terminalShell?: string;
   env?: NodeJS.ProcessEnv;
   subprocessInspector?: (terminalPid: number) => Effect.Effect<{
     readonly hasRunningSubprocess: boolean;
@@ -276,6 +277,9 @@ const createManager = (
           ? { historyByteLimit: options.historyByteLimit }
           : {}),
         ...(options.shellResolver !== undefined ? { shellResolver: options.shellResolver } : {}),
+        ...(options.terminalShell !== undefined
+          ? { terminalShell: Effect.succeed(options.terminalShell) }
+          : {}),
         ...(options.env !== undefined ? { env: options.env } : {}),
         ...(options.subprocessInspector !== undefined
           ? { subprocessInspector: options.subprocessInspector }
@@ -1923,6 +1927,26 @@ it.layer(
       expect(ptyAdapter.spawnInputs[0]?.env.T3CODE_SECRET).toBeUndefined();
       expect(snapshot).not.toHaveProperty("env");
       expect(snapshot).not.toHaveProperty("providerInstanceId");
+    }),
+  );
+
+  it.effect("spawns the configured terminal shell, falling back to the login shell", () =>
+    Effect.gen(function* () {
+      const ptyAdapter = new FakePtyAdapter();
+      const { manager } = yield* createManager(5, {
+        ptyAdapter,
+        terminalShell: "/missing/nu",
+        env: { SHELL: "/bin/zsh" },
+      }).pipe(Effect.provide(layerWithHostPlatform("linux")));
+      ptyAdapter.spawnFailures.push(new Error("spawn /missing/nu ENOENT"));
+
+      yield* manager.open(openInput());
+
+      expect(ptyAdapter.spawnInputs.map((input) => input.shell)).toEqual([
+        "/missing/nu",
+        "/bin/zsh",
+      ]);
+      expect(ptyAdapter.spawnInputs[1]?.env.SHELL).toBe("/bin/zsh");
     }),
   );
 
