@@ -45,6 +45,11 @@ node_modules/
 *.log
 .env*
 !.env.example
+!.envrc
 
 # pnpm content-addressable store; never belongs in the repo.
 .pnpm-store/
+
+# Nix
+.direnv
+result
