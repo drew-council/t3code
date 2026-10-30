@@ -61,10 +61,17 @@ const withEnvironmentThemes = <A, E>(
     );
   }).pipe(Effect.scoped);
 
-const currentThemes = Effect.gen(function* () {
+const isBundled = (theme: { readonly id: string }) =>
+  EnvironmentTheme.BUNDLED_THEMES.some((bundled) => bundled.id === theme.id);
+
+const allThemes = Effect.gen(function* () {
   const environmentTheme = yield* EnvironmentTheme.EnvironmentThemeService;
   return yield* environmentTheme.current;
 });
+
+const currentThemes = Effect.map(allThemes, (themes) =>
+  themes.filter((theme) => !isBundled(theme)),
+);
 
 it.layer(NodeServices.layer)("environment theme", (it) => {
   it.effect("follows the directory rather than the set read at start", () =>
@@ -105,7 +112,10 @@ it.layer(NodeServices.layer)("environment theme", (it) => {
         );
         const seen = yield* Queue.unbounded<ReadonlyArray<{ readonly id: string }>>();
         yield* Stream.runForEach(environmentTheme.streamChanges, (themes) =>
-          Queue.offer(seen, themes),
+          Queue.offer(
+            seen,
+            themes.filter((theme) => !isBundled(theme)),
+          ),
         ).pipe(Effect.forkScoped);
         assert.deepEqual(
           (yield* Queue.take(seen)).map((theme) => theme.id),
@@ -117,6 +127,26 @@ it.layer(NodeServices.layer)("environment theme", (it) => {
           (yield* Queue.take(seen)).map((theme) => theme.id),
           ["shared-light"],
         );
+      }),
+    ),
+  );
+
+  it.effect("ships the bundled theme until a published file takes its id", () =>
+    withEnvironmentThemes(
+      {},
+      Effect.gen(function* () {
+        const { environmentThemesDir } = yield* ServerConfig.ServerConfig;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const named = (themes: ReadonlyArray<{ readonly id: string; readonly name: string }>) =>
+          themes.filter((theme) => theme.id === "catppuccin-mocha-t3").map((theme) => theme.name);
+
+        assert.deepEqual(named(yield* allThemes), ["Catppuccin Mocha T3"]);
+        yield* fs.writeFileString(
+          path.join(environmentThemesDir, "catppuccin-mocha-t3.json"),
+          encodeThemeFile(NIGHTFALL_THEME),
+        );
+        assert.deepEqual(named(yield* allThemes), ["Nightfall"]);
       }),
     ),
   );
