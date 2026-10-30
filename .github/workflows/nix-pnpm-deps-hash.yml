@@ -1,0 +1,46 @@
+name: Nix pnpm deps hash
+
+# Keeps nix/pnpm-deps.hash in step with the lockfile so flake consumers can
+# follow drew/local-patches without editing hashes.
+on:
+  push:
+    branches: [drew/local-patches]
+    paths:
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - flake.lock
+      - nix/**
+      - .github/workflows/nix-pnpm-deps-hash.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nix-pnpm-deps-hash-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    if: github.repository == 'drew-council/t3code'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: cachix/install-nix-action@v31
+
+      - name: Recompute hash
+        run: ./nix/update-pnpm-deps-hash.sh
+
+      # Pushes made with GITHUB_TOKEN do not trigger workflows, so this
+      # commit does not rerun the job.
+      - name: Commit hash
+        run: |
+          if git diff --quiet -- nix/pnpm-deps.hash; then
+            echo "Hash is current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "nix: update pnpm deps hash" -- nix/pnpm-deps.hash
+          git push origin "HEAD:${GITHUB_REF_NAME}"
