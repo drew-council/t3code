@@ -7,6 +7,7 @@ import {
   type ThreadLinkedPullRequest,
 } from "@t3tools/contracts";
 import { makeDrainableWorker } from "@t3tools/shared/DrainableWorker";
+import { isTemporaryWorktreeBranch } from "@t3tools/shared/git";
 import * as NodeSqliteClient from "@t3tools/shared/nodeSqliteClient";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -25,6 +26,10 @@ import * as PullRequestService from "../pullRequest/PullRequestService.ts";
 import * as RepositoryIdentityResolver from "../project/RepositoryIdentityResolver.ts";
 import { forkParked } from "../serverActivation.ts";
 import { sourceControlDefinitions } from "../sourceControl/sourceControlDefinitions.ts";
+import {
+  normalizeThreadPullRequestKey,
+  threadPullRequestKeyOf,
+} from "../sourceControl/threadPullRequests.ts";
 import * as Orchestrator from "./Orchestrator.ts";
 
 class ThreadPullRequestServiceV2 extends Context.Service<
@@ -92,6 +97,8 @@ interface RefreshRequest {
   readonly threadId: ThreadId | null;
   readonly refresh: boolean;
   readonly backfill?: boolean;
+  /** Set when a run ends, so the saved branch catches up with checkouts made during it. */
+  readonly followCheckout?: boolean;
 }
 
 export const make = Effect.gen(function* () {
@@ -132,6 +139,59 @@ export const make = Effect.gen(function* () {
           return { snapshotSequence, threads: thread === null ? [] : [thread] };
         });
 
+  // gh stack and agents switch branches inside a worktree, which T3 never sees otherwise.
+  const followCheckout = Effect.fn("ThreadPullRequestServiceV2.followCheckout")(function* (
+    thread: OrchestrationV2ThreadShell,
+  ) {
+    // A temporary branch is still owned by the launch rename.
+    if (thread.worktreePath === null || thread.branch === null) return false;
+    if (isTemporaryWorktreeBranch(thread.branch)) return false;
+    yield* git.invalidateLocalStatus(thread.worktreePath);
+    const local = yield* git.localStatus({ cwd: thread.worktreePath });
+    // A detached HEAD mid-rebase has no name; keep the last branch until it lands.
+    if (local.refName === null || local.isDefaultRef || local.refName === thread.branch) {
+      return false;
+    }
+    const uuid = yield* crypto.randomUUIDv4();
+    yield* orchestrator.dispatch({
+      type: "thread.metadata.update",
+      commandId: CommandId.make(`server:thread-follow-checkout:${thread.id}:${uuid}`),
+      threadId: thread.id,
+      branch: local.refName,
+      expectedBranch: thread.branch,
+      expectedWorktreePath: thread.worktreePath,
+    });
+    return true;
+  });
+
+  // One linked layer is enough: stack sync links the rest of a native stack.
+  const linkStackedBranchPullRequest = Effect.fn(
+    "ThreadPullRequestServiceV2.linkStackedBranchPullRequest",
+  )(function* (
+    thread: OrchestrationV2ThreadShell,
+    detected: GitManager.GitBranchPullRequest,
+    projectId: OrchestrationProjectShell["id"],
+  ) {
+    if (thread.worktreePath === null || detected.state !== "open") return;
+    // Tombstones count, so a layer the user unlinked stays unlinked.
+    if ((thread.pullRequests ?? []).length > 0 || thread.linkedPullRequest != null) return;
+    const parsed = sourceControlDefinitions.parseChangeRequestUrl(detected.url);
+    if (parsed === null) return;
+    const key = normalizeThreadPullRequestKey(parsed.link);
+    const stack = yield* pullRequests.stack({ projectId, ...key }, { includeDetails: false });
+    if (stack === null) return;
+    yield* orchestrator.dispatch({
+      type: "thread.pull-request.link",
+      commandId: CommandId.make(
+        `server:pr-branch-stack-link:${thread.id}:${threadPullRequestKeyOf(key)}`,
+      ),
+      threadId: thread.id,
+      ...key,
+      url: detected.url,
+      source: "stack",
+    });
+  });
+
   const synchronize = Effect.fn("ThreadPullRequestServiceV2.synchronize")(function* (
     request: RefreshRequest,
   ) {
@@ -146,6 +206,22 @@ export const make = Effect.gen(function* () {
             (thread) => thread.lineage.relationshipToParent !== "subagent",
           )
         : threadSnapshot.threads;
+    if (request.followCheckout === true) {
+      const moved = yield* Effect.forEach(snapshotThreads, (thread) =>
+        followCheckout(thread).pipe(
+          Effect.catchCauseIf(
+            (cause) => !Cause.hasInterruptsOnly(cause),
+            (cause) =>
+              Effect.logWarning("thread checkout follow failed", {
+                threadId: thread.id,
+                cause: Cause.pretty(cause),
+              }).pipe(Effect.as(false)),
+          ),
+        ),
+      );
+      // The metadata update re-enqueues discovery for the new branch.
+      if (moved.some(Boolean)) return;
+    }
     const projects = new Map(projectShells.map((project) => [project.id, project]));
     if (request.backfill) {
       for (const thread of snapshotThreads) {
@@ -213,6 +289,24 @@ export const make = Effect.gen(function* () {
                   url: detected.url,
                 }
               : null;
+
+          if (detected !== null) {
+            yield* Effect.forEach(
+              group,
+              (thread) =>
+                linkStackedBranchPullRequest(thread, detected, project.id).pipe(
+                  Effect.catchCauseIf(
+                    (cause) => !Cause.hasInterruptsOnly(cause),
+                    (cause) =>
+                      Effect.logWarning("linking a stacked branch pull request failed", {
+                        threadId: thread.id,
+                        cause: Cause.pretty(cause),
+                      }),
+                  ),
+                ),
+              { discard: true },
+            );
+          }
 
           const plans = yield* Effect.forEach(group, (thread) =>
             Effect.gen(function* () {
@@ -379,7 +473,7 @@ export const make = Effect.gen(function* () {
           event.payload.status === "cancelled" ||
           event.payload.status === "interrupted"
         ) {
-          return worker.enqueue({ threadId: event.threadId, refresh: true });
+          return worker.enqueue({ threadId: event.threadId, refresh: true, followCheckout: true });
         }
         break;
     }
