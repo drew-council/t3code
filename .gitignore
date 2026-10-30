@@ -1,3 +1,7 @@
+# Nix
+.direnv
+result
+
 node_modules
 .bun
 .turbo
