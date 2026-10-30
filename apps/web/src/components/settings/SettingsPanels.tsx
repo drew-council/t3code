@@ -567,6 +567,9 @@ export function useSettingsRestore(onRestored?: () => void) {
     ...(settings.ghqCloneLayout !== DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout
       ? ["Clone into host folders"]
       : []),
+    ...(settings.terminalShell !== DEFAULT_UNIFIED_SETTINGS.terminalShell
+      ? ["Terminal shell"]
+      : []),
     ...(settings.confirmThreadUnpin !== DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin
       ? ["Unpin confirmation"]
       : []),
@@ -682,6 +685,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       newWorktreesStartFromOrigin: DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin,
       addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
       ghqCloneLayout: DEFAULT_UNIFIED_SETTINGS.ghqCloneLayout,
+      terminalShell: DEFAULT_UNIFIED_SETTINGS.terminalShell,
       confirmThreadArchive: DEFAULT_UNIFIED_SETTINGS.confirmThreadArchive,
       confirmThreadDelete: DEFAULT_UNIFIED_SETTINGS.confirmThreadDelete,
       confirmThreadUnpin: DEFAULT_UNIFIED_SETTINGS.confirmThreadUnpin,
@@ -1644,6 +1648,7 @@ export function ThreadsSettingsPanel() {
     textGenerationModelInstanceEntries,
   );
   const mixedAddProjectBaseDirectory = useScopedSettingsMixed(["addProjectBaseDirectory"]);
+  const mixedTerminalShell = useScopedSettingsMixed(["terminalShell"]);
   const mixedTextGenerationModel = useScopedSettingsMixed(["textGenerationModelSelection"]);
 
   return (
@@ -1705,6 +1710,38 @@ export function ThreadsSettingsPanel() {
           }
         />
       </SettingsSection>
+
+      {!isProjectScope ? (
+        <SettingsSection id="terminal" title="Terminal">
+          <SettingsRow
+            serverScoped
+            settingKeys={["terminalShell"]}
+            {...searchableSetting("terminal-shell")}
+            description="Shell that new terminals run, such as nu or /bin/fish. Leave empty to use your login shell."
+            resetAction={
+              settings.terminalShell !== DEFAULT_UNIFIED_SETTINGS.terminalShell ? (
+                <SettingResetButton
+                  label="terminal shell"
+                  onClick={() =>
+                    updateSettings({ terminalShell: DEFAULT_UNIFIED_SETTINGS.terminalShell })
+                  }
+                />
+              ) : null
+            }
+            control={
+              <DraftInput
+                size="sm"
+                className="w-full sm:w-72"
+                value={mixedTerminalShell ? "" : settings.terminalShell}
+                onCommit={(next) => updateSettings({ terminalShell: next })}
+                placeholder={mixedTerminalShell ? "Mixed" : "Login shell"}
+                spellCheck={false}
+                aria-label="Terminal shell"
+              />
+            }
+          />
+        </SettingsSection>
+      ) : null}
 
       <ProjectDefaultsSettings category="general" />
 

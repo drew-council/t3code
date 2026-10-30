@@ -802,6 +802,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["ghq clone destination host owner repository root layout"],
   },
   {
+    id: "terminal-shell",
+    title: "Terminal shell",
+    to: "/settings/threads",
+    scope: "environment",
+    searchTerms: ["shell nushell nu zsh bash fish login default command"],
+  },
+  {
     id: "unpin-confirmation",
     title: "Unpin confirmation",
     to: "/settings/general",

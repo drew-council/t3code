@@ -1407,6 +1407,8 @@ interface TerminalManagerOptions {
   historyByteLimit?: number;
   ptyAdapter: PtyAdapter.PtyAdapter["Service"];
   shellResolver?: () => string;
+  /** The configured terminal shell, read at each spawn. Empty uses `shellResolver`. */
+  terminalShell?: Effect.Effect<string>;
   env?: NodeJS.ProcessEnv;
   managedBinaryCacheDir?: string;
   managedBinaryToolsDir?: string;
@@ -1508,6 +1510,10 @@ export const make = Effect.fn("TerminalManager.make")(function* () {
     registerTerminalProcesses: portDiscovery.registerTerminalProcesses,
     unregisterTerminal: portDiscovery.unregisterTerminal,
     resolveProviderInstanceEnvironment,
+    terminalShell: serverSettings.getSettings.pipe(
+      Effect.map((settings) => settings.terminalShell),
+      Effect.orElseSucceed(() => ""),
+    ),
   });
 });
 
@@ -2443,7 +2449,12 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
       increment(terminalSessionsTotal, { lifecycle: eventType }).pipe(
         Effect.andThen(
           Effect.gen(function* () {
-            const shellCandidates = resolveShellCandidates(shellResolver, platform, baseEnv);
+            const terminalShell = options.terminalShell ? yield* options.terminalShell : "";
+            const shellCandidates = resolveShellCandidates(
+              terminalShell ? () => terminalShell : shellResolver,
+              platform,
+              baseEnv,
+            );
             const terminalEnv = createTerminalSpawnEnv(
               baseEnv,
               session.runtimeEnv,
