@@ -522,6 +522,13 @@ export class GitHubPullRequestApi extends Context.Service<
       readonly number: number;
     }) => Effect.Effect<GitHubPullRequestStack | null, GitHubPullRequestApiError>;
 
+    readonly createPullRequestStack: (input: {
+      readonly cwd: string;
+      readonly repository: string;
+      readonly host: string;
+      readonly numbers: ReadonlyArray<number>;
+    }) => Effect.Effect<void, GitHubPullRequestApiError>;
+
     readonly getPullRequestActivity: (input: {
       readonly cwd: string;
       readonly repository: string;
@@ -2066,6 +2073,21 @@ export const make = Effect.gen(function* () {
         }),
       );
     }),
+
+    createPullRequestStack: Effect.fn("GitHubPullRequestApi.createPullRequestStack")(
+      function (input) {
+        const { owner, name } = parseRepositorySelector(input.repository);
+        return api
+          .rest({
+            host: input.host,
+            operation: "createPullRequestStack",
+            method: "POST",
+            path: `repos/${owner}/${name}/stacks`,
+            body: { pull_requests: input.numbers },
+          })
+          .pipe(Effect.asVoid);
+      },
+    ),
 
     getPullRequestActivity: Effect.fn("GitHubPullRequestApi.getPullRequestActivity")(
       function* (input) {
