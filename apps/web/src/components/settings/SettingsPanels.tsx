@@ -110,6 +110,8 @@ import { useUpdateEverythingRun } from "../sidebar/updateEverythingRun";
 import { awaitsTrackSwitch, channelSwitchLabel } from "../sidebar/updateEverything.logic";
 import { isHostedByThisApp } from "../sidebar/useUpdateEverything";
 
+import { clearOnePasswordSecrets } from "~/lib/onePasswordSecrets";
+
 const RESPONSE_STREAMING_MODE_LABELS: Record<ResponseStreamingMode, string> = {
   turn: "Wait for the full response",
   paragraph: "Show finished paragraphs",
@@ -1101,6 +1103,27 @@ export function GeneralSettingsPanel() {
           }
         />
       </SettingsSection>
+
+      {isElectron ? (
+        <SettingsSection id="one-password" title="1Password">
+          <SettingsRow
+            {...searchableSetting("one-password-cached-secrets")}
+            description="Secrets read from 1Password stay on this device until cleared. Clear them after rotating a secret."
+            control={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  clearOnePasswordSecrets();
+                  toastManager.add({ type: "success", title: "Cleared cached 1Password secrets" });
+                }}
+              >
+                Clear cached secrets
+              </Button>
+            }
+          />
+        </SettingsSection>
+      ) : null}
     </SettingsPageContainer>
   );
 }
@@ -1188,36 +1211,6 @@ export function ChatSettingsPanel() {
                 ))}
               </SelectPopup>
             </Select>
-          }
-        />
-        <SettingsRow
-          {...searchableSetting("voice-input-openai-key")}
-          description="OpenAI API key for the composer's dictation button. Stored only on this device. Leave empty to hide the button."
-          resetAction={
-            settings.openaiTranscriptionApiKey !==
-            DEFAULT_UNIFIED_SETTINGS.openaiTranscriptionApiKey ? (
-              <SettingResetButton
-                label="voice input API key"
-                onClick={() =>
-                  updateSettings({
-                    openaiTranscriptionApiKey: DEFAULT_UNIFIED_SETTINGS.openaiTranscriptionApiKey,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <DraftInput
-              size="sm"
-              type="password"
-              className="w-full sm:w-72"
-              value={settings.openaiTranscriptionApiKey}
-              onCommit={(next) => updateSettings({ openaiTranscriptionApiKey: next.trim() })}
-              placeholder="sk-..."
-              autoComplete="off"
-              spellCheck={false}
-              aria-label="Voice input OpenAI API key"
-            />
           }
         />
         <AdvancedSettings targetIds={[searchableSetting("skills-in-slash-menu").id]}>

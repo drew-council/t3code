@@ -1049,6 +1049,11 @@ export interface DesktopBridge {
   getLocalEnvironmentBearerToken: () => Promise<string>;
   getClientSettings: () => Promise<ClientSettings | null>;
   setClientSettings: (settings: ClientSettings) => Promise<void>;
+  /** Reads every 1Password reference with one approval; rejects when any of them fails. */
+  readOnePasswordSecrets: (input: {
+    readonly account: string | null;
+    readonly references: readonly string[];
+  }) => Promise<readonly string[]>;
   getConnectionCatalog: () => Promise<string | null>;
   setConnectionCatalog: (catalog: string) => Promise<boolean>;
   discoverSshHosts: () => Promise<readonly DesktopDiscoveredSshHost[]>;

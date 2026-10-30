@@ -2,7 +2,7 @@ import type { VoiceDraftSnapshot, VoiceInputState } from "@t3tools/client-runtim
 import { MicIcon, SquareIcon, XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { useClientSettings } from "~/hooks/useSettings";
+import { isElectron } from "~/env";
 import { createOpenAiVoiceInputController } from "~/lib/openAiVoiceInput";
 import { Button } from "../ui/button";
 import { Spinner } from "../ui/spinner";
@@ -22,9 +22,6 @@ export function ComposerVoiceInputButton({
     selection: { readonly start: number; readonly end: number },
   ) => void;
 }) {
-  const configured = useClientSettings(
-    (settings) => settings.openaiTranscriptionApiKey.trim().length > 0,
-  );
   const [state, setState] = useState(IDLE_STATE);
   const [controller] = useState(() =>
     createOpenAiVoiceInputController({
@@ -42,7 +39,8 @@ export function ComposerVoiceInputButton({
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- releases the microphone and drops the recording on unmount
   useEffect(() => () => controller.dispose(), [controller]);
 
-  if (!configured && state.phase === "idle") return null;
+  // The OpenAI key comes from 1Password, which only the desktop app can reach.
+  if (!isElectron) return null;
 
   if (state.phase === "recording") {
     return (

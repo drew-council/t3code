@@ -56,6 +56,8 @@ import { registerOpenFavoriteEditorCommand } from "./components/chat/OpenInPicke
 import { environmentThreadShells } from "./state/threads";
 import { resolveThreadRouteTarget } from "./threadRoutes";
 
+import { startOnePasswordSecretSync } from "./lib/onePasswordSecrets";
+
 /** Writes appearance settings onto the document, touching only the groups that changed. */
 function startClientAppearance(): void {
   const root = document.documentElement;
@@ -186,6 +188,7 @@ export function startAppServices(): AppRouter {
   startModelPreferencesMigration();
   startAgentOpenedPreviews();
   if (isElectron) startElectronBrowserHost();
+  if (isElectron) void startOnePasswordSecretSync();
   startPreviewTitleRecording();
   startBrowserProfileReporting();
   installChatRouteCommands(router);
