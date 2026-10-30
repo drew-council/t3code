@@ -38,6 +38,7 @@ import {
 import { syncBrowserChromeTheme } from "./hooks/useTheme";
 import { startThreadVisitedMigration } from "./hooks/useThreadVisitedMigration";
 import { installDesktopPasteAsText } from "./lib/desktopPasteAsText";
+import { startOnePasswordSecretSync } from "./lib/onePasswordSecrets";
 import {
   syncDocumentElectronPlatformClasses,
   syncDocumentWindowControlsOverlayClass,
@@ -173,6 +174,7 @@ export function startAppServices(): AppRouter {
   startModelPreferencesMigration();
   startAgentOpenedPreviews();
   if (isElectron) startElectronBrowserHost();
+  if (isElectron) void startOnePasswordSecretSync();
   startPreviewTitleRecording();
   startBrowserProfileReporting();
   installChatRouteCommands(router);
