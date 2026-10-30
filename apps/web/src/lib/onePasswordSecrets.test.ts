@@ -1,27 +1,17 @@
 import { describe, expect, it, vi } from "vite-plus/test";
 
-const state = vi.hoisted(() => ({
-  settings: { onePasswordAccount: "", openaiTranscriptionApiKey: "", otherKey: "" },
-}));
-
-vi.mock("~/hooks/useSettings", () => ({
-  getClientSettings: () => state.settings,
-  ensureClientSettingsHydrated: async () => undefined,
-}));
-
 import {
+  ONE_PASSWORD_SECRETS,
   forgetOnePasswordSecret,
-  resolveSecretSetting,
+  resolveOnePasswordSecret,
   startOnePasswordSecretSync,
 } from "./onePasswordSecrets";
 
-function setup() {
-  state.settings = {
-    onePasswordAccount: "",
-    openaiTranscriptionApiKey: "op://vault/openai/credential",
-    otherKey: "op://vault/other/credential",
-  };
-  const storage = new Map<string, string>();
+const OPENAI = ONE_PASSWORD_SECRETS.openaiApiKey;
+const STORAGE_KEY = "t3code:one-password-secrets:v2";
+
+function setup(stored: Record<string, string> = {}) {
+  const storage = new Map([[STORAGE_KEY, JSON.stringify(stored)]]);
   const readOnePasswordSecrets = vi.fn(async (input: { readonly references: readonly string[] }) =>
     input.references.map((reference) => `secret:${reference}`),
   );
@@ -33,57 +23,39 @@ function setup() {
       removeItem: (key: string) => storage.delete(key),
     },
   });
-  return { readOnePasswordSecrets };
+  return { readOnePasswordSecrets, storage };
 }
 
 describe("onePasswordSecrets", () => {
-  it("reads every uncached reference in one approval and serves later reads from the cache", async () => {
+  it("reads uncached secrets in one approval and serves later reads from the cache", async () => {
     const { readOnePasswordSecrets } = setup();
 
-    const [openai, again] = await Promise.all([
-      resolveSecretSetting("op://vault/openai/credential"),
-      resolveSecretSetting("op://vault/openai/credential"),
+    const [first, second] = await Promise.all([
+      resolveOnePasswordSecret("openaiApiKey"),
+      resolveOnePasswordSecret("openaiApiKey"),
     ]);
-    expect(openai).toBe("secret:op://vault/openai/credential");
-    expect(again).toBe(openai);
-    expect(await resolveSecretSetting("op://vault/other/credential")).toBe(
-      "secret:op://vault/other/credential",
-    );
-    expect(await resolveSecretSetting(" sk-plain ")).toBe("sk-plain");
+    expect(first).toBe(`secret:${OPENAI}`);
+    expect(second).toBe(first);
     expect(readOnePasswordSecrets).toHaveBeenCalledTimes(1);
     expect(readOnePasswordSecrets).toHaveBeenCalledWith({
-      account: null,
-      references: ["op://vault/openai/credential", "op://vault/other/credential"],
+      account: "XH4EFF5WXBGXJOIXZG4PLGILIE",
+      references: [OPENAI],
     });
 
-    forgetOnePasswordSecret("op://vault/openai/credential");
-    await resolveSecretSetting("op://vault/openai/credential");
-    expect(readOnePasswordSecrets).toHaveBeenLastCalledWith({
-      account: null,
-      references: ["op://vault/openai/credential"],
-    });
-
-    state.settings = { ...state.settings, onePasswordAccount: "my.1password.com" };
-    await resolveSecretSetting("op://vault/other/credential");
-    expect(readOnePasswordSecrets).toHaveBeenLastCalledWith({
-      account: "my.1password.com",
-      references: ["op://vault/other/credential", "op://vault/openai/credential"],
-    });
-    expect(readOnePasswordSecrets).toHaveBeenCalledTimes(3);
+    forgetOnePasswordSecret("openaiApiKey");
+    await resolveOnePasswordSecret("openaiApiKey");
+    expect(readOnePasswordSecrets).toHaveBeenCalledTimes(2);
   });
 
-  it("drops secrets no setting references at startup", async () => {
-    const { readOnePasswordSecrets } = setup();
-    await resolveSecretSetting("op://vault/openai/credential");
-
-    state.settings = { ...state.settings, otherKey: "" };
-    await startOnePasswordSecretSync();
-    state.settings = { ...state.settings, otherKey: "op://vault/other/credential" };
-    await resolveSecretSetting("op://vault/other/credential");
-
-    expect(readOnePasswordSecrets).toHaveBeenLastCalledWith({
-      account: null,
-      references: ["op://vault/other/credential"],
+  it("drops secrets the code no longer names and skips cached ones at startup", async () => {
+    const { readOnePasswordSecrets, storage } = setup({
+      [OPENAI]: "cached",
+      "op://vault/retired/credential": "stale",
     });
+
+    await startOnePasswordSecretSync();
+
+    expect(readOnePasswordSecrets).not.toHaveBeenCalled();
+    expect(JSON.parse(storage.get(STORAGE_KEY) ?? "{}")).toEqual({ [OPENAI]: "cached" });
   });
 });

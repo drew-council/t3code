@@ -579,12 +579,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["composer rich text tiptap bold italic markdown styled wysiwyg"],
   },
   {
-    id: "voice-input-openai-key",
-    title: "Voice input",
-    to: "/settings/chat",
-    searchTerms: ["dictation microphone speech transcribe openai api key"],
-  },
-  {
     id: "send-shortcut",
     title: "Send shortcut",
     to: "/settings/chat",
@@ -673,12 +667,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Delete confirmation",
     to: "/settings/general",
     searchTerms: ["ask before thread chat history"],
-  },
-  {
-    id: "one-password-account",
-    title: "1Password account",
-    to: "/settings/general",
-    searchTerms: ["1password op secret reference account vault"],
   },
   {
     id: "one-password-cached-secrets",

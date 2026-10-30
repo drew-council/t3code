@@ -8,8 +8,7 @@ import {
   throwIfVoiceTranscriptionAborted,
 } from "@t3tools/client-runtime/voice-input";
 
-import { getClientSettings } from "~/hooks/useSettings";
-import { forgetOnePasswordSecret, resolveSecretSetting } from "~/lib/onePasswordSecrets";
+import { forgetOnePasswordSecret, resolveOnePasswordSecret } from "~/lib/onePasswordSecrets";
 
 const OPENAI_TRANSCRIPTION_URL = "https://api.openai.com/v1/audio/transcriptions";
 const OPENAI_TRANSCRIPTION_MODEL = "gpt-transcribe";
@@ -107,7 +106,6 @@ function openAiErrorMessage(body: unknown, status: number): string {
 
 async function transcribeRecording(
   apiKey: string,
-  keySetting: string,
   uri: string,
   signal: AbortSignal,
 ): Promise<string> {
@@ -135,7 +133,7 @@ async function transcribeRecording(
     });
   }
   if (!response.ok) {
-    if (response.status === 401) forgetOnePasswordSecret(keySetting);
+    if (response.status === 401) forgetOnePasswordSecret("openaiApiKey");
     throw new VoiceTranscriptionError(
       "transcription-failed",
       openAiErrorMessage(body, response.status),
@@ -145,29 +143,30 @@ async function transcribeRecording(
   return typeof body.text === "string" ? body.text : "";
 }
 
-function openAiTranscriber(keySetting: string): VoiceTranscriber {
-  return {
-    prepare: async ({ signal }) => {
-      let apiKey: string | null;
-      try {
-        apiKey = await resolveSecretSetting(keySetting);
-      } catch (cause) {
-        throwIfVoiceTranscriptionAborted(signal);
-        const detail = cause instanceof Error ? cause.message : String(cause);
-        throw new VoiceTranscriptionError("preparation-failed", detail, { cause });
-      }
+const openAiTranscriber: VoiceTranscriber = {
+  prepare: async ({ signal }) => {
+    let apiKey: string | null;
+    try {
+      apiKey = await resolveOnePasswordSecret("openaiApiKey");
+    } catch (cause) {
       throwIfVoiceTranscriptionAborted(signal);
-      if (!apiKey) {
-        throw new VoiceTranscriptionError("preparation-failed", "The OpenAI API key is empty.");
-      }
-      const key = apiKey;
-      return {
-        locale: navigator.language,
-        transcribe: (uri, options) => transcribeRecording(key, keySetting, uri, options.signal),
-      };
-    },
-  };
-}
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      throw new VoiceTranscriptionError("preparation-failed", detail, { cause });
+    }
+    throwIfVoiceTranscriptionAborted(signal);
+    if (!apiKey) {
+      throw new VoiceTranscriptionError(
+        "preparation-failed",
+        "1Password returned no OpenAI API key.",
+      );
+    }
+    const key = apiKey;
+    return {
+      locale: navigator.language,
+      transcribe: (uri, options) => transcribeRecording(key, uri, options.signal),
+    };
+  },
+};
 
 async function requestMicrophonePermission() {
   try {
@@ -202,10 +201,7 @@ export function createOpenAiVoiceInputController(input: {
   );
   const controller: VoiceInputController = new VoiceInputController({
     recorder,
-    getTranscriber: () => {
-      const keySetting = getClientSettings().openaiTranscriptionApiKey.trim();
-      return keySetting ? openAiTranscriber(keySetting) : null;
-    },
+    getTranscriber: () => openAiTranscriber,
     requestPermission: requestMicrophonePermission,
     configureRecording: () => recorder.acquireMicrophone(),
     releaseRecording: async () => recorder.releaseMicrophone(),

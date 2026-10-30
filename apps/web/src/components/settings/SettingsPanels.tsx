@@ -70,7 +70,7 @@ import { useEnvironmentProviders, useEnvironments } from "../../state/environmen
 import { EMPTY_SERVER_PROVIDERS } from "../../state/server";
 import { Button } from "../ui/button";
 import { DraftInput } from "../ui/draft-input";
-import { clearOnePasswordSecrets, isOnePasswordReference } from "~/lib/onePasswordSecrets";
+import { clearOnePasswordSecrets } from "~/lib/onePasswordSecrets";
 import { Input } from "../ui/input";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
@@ -1088,33 +1088,6 @@ export function GeneralSettingsPanel() {
       {isElectron ? (
         <SettingsSection id="one-password" title="1Password">
           <SettingsRow
-            {...searchableSetting("one-password-account")}
-            description="Account for op:// references in settings, such as my.1password.com or an account ID. Leave empty to use op's default account."
-            resetAction={
-              settings.onePasswordAccount !== DEFAULT_UNIFIED_SETTINGS.onePasswordAccount ? (
-                <SettingResetButton
-                  label="1Password account"
-                  onClick={() =>
-                    updateSettings({
-                      onePasswordAccount: DEFAULT_UNIFIED_SETTINGS.onePasswordAccount,
-                    })
-                  }
-                />
-              ) : null
-            }
-            control={
-              <DraftInput
-                size="sm"
-                className="w-full sm:w-72"
-                value={settings.onePasswordAccount}
-                onCommit={(next) => updateSettings({ onePasswordAccount: next.trim() })}
-                placeholder="Default account"
-                spellCheck={false}
-                aria-label="1Password account"
-              />
-            }
-          />
-          <SettingsRow
             {...searchableSetting("one-password-cached-secrets")}
             description="Secrets read from 1Password stay on this device until cleared. Clear them after rotating a secret."
             control={
@@ -1219,38 +1192,6 @@ export function ChatSettingsPanel() {
                 ))}
               </SelectPopup>
             </Select>
-          }
-        />
-        <SettingsRow
-          {...searchableSetting("voice-input-openai-key")}
-          description="OpenAI API key, or a 1Password reference like op://vault/item/credential in the desktop app, for the composer's dictation button. Leave empty to hide the button."
-          resetAction={
-            settings.openaiTranscriptionApiKey !==
-            DEFAULT_UNIFIED_SETTINGS.openaiTranscriptionApiKey ? (
-              <SettingResetButton
-                label="voice input API key"
-                onClick={() =>
-                  updateSettings({
-                    openaiTranscriptionApiKey: DEFAULT_UNIFIED_SETTINGS.openaiTranscriptionApiKey,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <DraftInput
-              size="sm"
-              type={
-                isOnePasswordReference(settings.openaiTranscriptionApiKey) ? "text" : "password"
-              }
-              className="w-full sm:w-72"
-              value={settings.openaiTranscriptionApiKey}
-              onCommit={(next) => updateSettings({ openaiTranscriptionApiKey: next.trim() })}
-              placeholder="sk-... or op://vault/item/credential"
-              autoComplete="off"
-              spellCheck={false}
-              aria-label="Voice input OpenAI API key"
-            />
           }
         />
         <AdvancedSettings targetIds={[searchableSetting("skills-in-slash-menu").id]}>
