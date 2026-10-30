@@ -99,10 +99,17 @@ const withEnvironmentThemes = <A, E>(
     );
   });
 
-const currentThemes = Effect.gen(function* () {
+const isBundled = (theme: { readonly id: string }) =>
+  EnvironmentTheme.BUNDLED_THEMES.some((bundled) => bundled.id === theme.id);
+
+const allThemes = Effect.gen(function* () {
   const environmentTheme = yield* EnvironmentTheme.EnvironmentThemeService;
   return yield* environmentTheme.current;
 });
+
+const currentThemes = Effect.map(allThemes, (themes) =>
+  themes.filter((theme) => !isBundled(theme)),
+);
 
 it.layer(NodeServices.layer)("environment theme", (it) => {
   it.effect("follows the directory rather than the set read at start", () =>
@@ -143,7 +150,10 @@ it.layer(NodeServices.layer)("environment theme", (it) => {
         );
         const seen = yield* Queue.unbounded<ReadonlyArray<{ readonly id: string }>>();
         yield* Stream.runForEach(environmentTheme.streamChanges, (themes) =>
-          Queue.offer(seen, themes),
+          Queue.offer(
+            seen,
+            themes.filter((theme) => !isBundled(theme)),
+          ),
         ).pipe(Effect.forkScoped);
         assert.deepEqual(
           (yield* Queue.take(seen)).map((theme) => theme.id),
@@ -155,6 +165,26 @@ it.layer(NodeServices.layer)("environment theme", (it) => {
           (yield* Queue.take(seen)).map((theme) => theme.id),
           ["shared-light"],
         );
+      }),
+    ),
+  );
+
+  it.effect("ships the bundled theme until a published file takes its id", () =>
+    withEnvironmentThemes(
+      {},
+      Effect.gen(function* () {
+        const { environmentThemesDir } = yield* ServerConfig.ServerConfig;
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const named = (themes: ReadonlyArray<{ readonly id: string; readonly name: string }>) =>
+          themes.filter((theme) => theme.id === "catppuccin-mocha-t3").map((theme) => theme.name);
+
+        assert.deepEqual(named(yield* allThemes), ["Catppuccin Mocha T3"]);
+        yield* fs.writeFileString(
+          path.join(environmentThemesDir, "catppuccin-mocha-t3.json"),
+          encodeThemeFile(NIGHTFALL_THEME),
+        );
+        assert.deepEqual(named(yield* allThemes), ["Nightfall"]);
       }),
     ),
   );
@@ -191,7 +221,7 @@ it.layer(NodeServices.layer)("environment theme", (it) => {
           .apply({ themeId: REFUSED_THEME_ID, theme: { ...NIGHTFALL_THEME, name: "Changed" } })
           .pipe(Effect.flip);
         assert.strictEqual(refused._tag, "EnvironmentThemeNotSelectedError");
-        assert.deepEqual(yield* themes.current, [{ id: REFUSED_THEME_ID, ...NIGHTFALL_THEME }]);
+        assert.deepEqual(yield* currentThemes, [{ id: REFUSED_THEME_ID, ...NIGHTFALL_THEME }]);
       }),
     ),
   );
@@ -236,7 +266,7 @@ it.layer(NodeServices.layer)("environment theme", (it) => {
 
         yield* themes.apply({ themeId: "look", theme: NIGHTFALL_THEME });
         assert.strictEqual(yield* fs.readFileString(outside), "keep");
-        assert.deepEqual(yield* themes.current, [{ id: "look", ...NIGHTFALL_THEME }]);
+        assert.deepEqual(yield* currentThemes, [{ id: "look", ...NIGHTFALL_THEME }]);
       }),
     ),
   );
@@ -266,7 +296,7 @@ it.layer(NodeServices.layer)("environment theme", (it) => {
         const css =
           "/* from url(https://example.com/guide) */ [data-chat-header] { border-bottom: 1px solid red; }";
         yield* themes.apply({ themeId: "agent-look", theme: { ...NIGHTFALL_THEME, css } });
-        assert.deepEqual(yield* themes.current, [{ id: "agent-look", ...NIGHTFALL_THEME, css }]);
+        assert.deepEqual(yield* currentThemes, [{ id: "agent-look", ...NIGHTFALL_THEME, css }]);
 
         const leaky = yield* themes
           .apply({
@@ -289,7 +319,7 @@ it.layer(NodeServices.layer)("environment theme", (it) => {
         yield* themes.apply({ appearance: "light" });
 
         assert.deepEqual(
-          (yield* themes.current).map((theme) => theme.id),
+          (yield* currentThemes).map((theme) => theme.id),
           ["agent-look"],
         );
         // Only a theme that was published or already exists becomes the environment theme.

@@ -38,6 +38,7 @@ import * as Stream from "effect/Stream";
 
 import * as ServerConfig from "./config.ts";
 import * as ServerSettings from "./serverSettings.ts";
+import catppuccinMocha from "./themes/catppuccin-mocha-t3.json" with { type: "json" };
 
 const decodeEnvironmentThemeFileJsonExit = Schema.decodeUnknownExit(
   Schema.fromJsonString(EnvironmentThemeFile),
@@ -46,6 +47,11 @@ const encodeEnvironmentThemeFileJson = Schema.encodeEffect(
   fromJsonStringPretty(EnvironmentThemeFile),
 );
 const isEnvironmentThemeId = Schema.is(EnvironmentThemeId);
+
+/** Ships with the server; a published file with the same id replaces it. */
+export const BUNDLED_THEMES: ReadonlyArray<EnvironmentTheme> = [
+  Schema.decodeUnknownSync(EnvironmentTheme)({ id: "catppuccin-mocha-t3", ...catppuccinMocha }),
+];
 
 const THEME_FILE_SUFFIX = ".json";
 
@@ -277,7 +283,8 @@ export const readPublishedThemes = Effect.fn(function* (themesDir: string) {
     const background = findThemeBackground(themesDir, id, entryNames);
     themes.push({ id, ...file, ...(background ? { background: background.revision } : {}) });
   }
-  return themes;
+  const publishedIds = new Set(themes.map((theme) => theme.id));
+  return [...themes, ...BUNDLED_THEMES.filter((theme) => !publishedIds.has(theme.id))];
 });
 
 const make = Effect.gen(function* () {
