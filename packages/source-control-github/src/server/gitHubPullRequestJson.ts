@@ -235,8 +235,11 @@ export function toPullRequestPreview(
 /** Search rejects first > 100 with EXCESSIVE_PAGINATION. */
 export const PULL_REQUEST_SEARCH_MAX_ROWS = 100;
 
+/** A hundred listed rows can outrun GitHub's 10s query limit on busy repositories, which 502s. */
+const PULL_REQUEST_LIST_PAGE_ROWS = 34;
+
 export function pageRows(rows: number): number {
-  return Math.min(Math.max(Math.trunc(rows), 1), PULL_REQUEST_SEARCH_MAX_ROWS);
+  return Math.min(Math.max(Math.trunc(rows), 1), PULL_REQUEST_LIST_PAGE_ROWS);
 }
 
 export function toPullRequestNodeId(result: {

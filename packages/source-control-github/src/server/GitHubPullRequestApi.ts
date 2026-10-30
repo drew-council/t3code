@@ -1720,7 +1720,7 @@ export const make = Effect.gen(function* () {
         pageInfo: { hasNextPage: page.endCursor !== null, endCursor: page.endCursor },
       });
       /**
-       * Pages of up to a hundred until `rows` have arrived or GitHub has no more. Each page asks
+       * Pages of up to `pageRows` until `rows` have arrived or GitHub has no more. Each page asks
        * for only the rows still missing, so the last one does not overshoot.
        */
       const collect = Effect.fn("GitHubPullRequestApi.collect")(function* (

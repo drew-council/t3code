@@ -1265,6 +1265,40 @@ layer("GitHubPullRequestApi.layer", (it) => {
     }),
   );
 
+  it.effect("reads a hundred rows in pages GitHub answers inside its query timeout", () =>
+    Effect.gen(function* () {
+      const page = (count: number, firstNumber: number, endCursor: string) =>
+        output(
+          encodeJson({
+            data: {
+              search: {
+                pageInfo: { hasNextPage: true, endCursor },
+                nodes: rows(count, firstNumber),
+              },
+            },
+          }),
+        );
+      mockedExecute.mockReturnValueOnce(Effect.succeed(page(34, 1, "c1")));
+      mockedExecute.mockReturnValueOnce(Effect.succeed(page(34, 35, "c2")));
+      mockedExecute.mockReturnValueOnce(Effect.succeed(output(pullRequests(32, 69))));
+      const cli = yield* GitHubPullRequestApi.GitHubPullRequestApi;
+
+      const batch = yield* cli.listPullRequests({
+        cwd: "/w",
+        repository: "acme/web",
+        host: "github.com",
+        state: "open",
+        involvement: "all",
+        viewer: "bilal",
+        limit: 99,
+      });
+
+      expect([0, 1, 2].map((index) => varsAt(index)["first"])).toEqual([34, 34, 32]);
+      assert.strictEqual(batch.items.length, 99);
+      assert.isTrue(batch.truncated);
+    }),
+  );
+
   it.effect("reports truncation when GitHub repeats a cursor before the page is full", () =>
     Effect.gen(function* () {
       const repeating = output(
