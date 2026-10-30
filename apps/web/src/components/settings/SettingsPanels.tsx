@@ -1190,6 +1190,36 @@ export function ChatSettingsPanel() {
             </Select>
           }
         />
+        <SettingsRow
+          {...searchableSetting("voice-input-openai-key")}
+          description="OpenAI API key for the composer's dictation button. Stored only on this device. Leave empty to hide the button."
+          resetAction={
+            settings.openaiTranscriptionApiKey !==
+            DEFAULT_UNIFIED_SETTINGS.openaiTranscriptionApiKey ? (
+              <SettingResetButton
+                label="voice input API key"
+                onClick={() =>
+                  updateSettings({
+                    openaiTranscriptionApiKey: DEFAULT_UNIFIED_SETTINGS.openaiTranscriptionApiKey,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <DraftInput
+              size="sm"
+              type="password"
+              className="w-full sm:w-72"
+              value={settings.openaiTranscriptionApiKey}
+              onCommit={(next) => updateSettings({ openaiTranscriptionApiKey: next.trim() })}
+              placeholder="sk-..."
+              autoComplete="off"
+              spellCheck={false}
+              aria-label="Voice input OpenAI API key"
+            />
+          }
+        />
         <AdvancedSettings targetIds={[searchableSetting("skills-in-slash-menu").id]}>
           <SettingsRow
             {...searchableSetting("skills-in-slash-menu")}

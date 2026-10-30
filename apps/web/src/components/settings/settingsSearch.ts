@@ -589,6 +589,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["composer rich text tiptap bold italic markdown styled wysiwyg"],
   },
   {
+    id: "voice-input-openai-key",
+    title: "Voice input",
+    to: "/settings/chat",
+    searchTerms: ["dictation microphone speech transcribe openai api key"],
+  },
+  {
     id: "send-shortcut",
     title: "Send shortcut",
     to: "/settings/chat",
