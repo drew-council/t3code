@@ -3638,6 +3638,8 @@
   "13087312bc6a0b45": "Pull requests",
   "efb65f53a2382026": "Remove agent credits when merging",
   "88631d9ea293eccd": "Remove recognized agent credits from merge and squash messages on hosts that support it, keeping human co-authors. Includes auto-merge. Excludes merge queues, stack merges, and existing commits.",
+  "57b7f33c7362b0c3": "Register pull request chains as stacks",
+  "08c67ce52d486325": "Register a chain of linked pull requests, each based on the one below it, as a stack on hosts that support stacks, so reviewers see it there. Adds only; existing stacks are left alone.",
   "15ed472fb3ba4a6d": "Default branch",
   "abe5615aea30066d": "Automatically pull",
   "17782375efd2c928": "Keep the default branch current when there are no local changes.",

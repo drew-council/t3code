@@ -1193,6 +1193,15 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: [msg("auto pull default branch current checkout fast forward upstream")],
   },
   {
+    id: "register-pull-request-chains-as-stacks",
+    title: msg("Register pull request chains as stacks"),
+    to: "/settings/source-control",
+    scope: "project-defaults",
+    searchTerms: [
+      `pull request ${SOURCE_CONTROL_HOST_LABELS} stack stacked gh-stack chain reviewers link`,
+    ],
+  },
+  {
     id: "remove-agent-credits-on-merge",
     title: msg("Remove agent credits when merging"),
     to: "/settings/source-control",

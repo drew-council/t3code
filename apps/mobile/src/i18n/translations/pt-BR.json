@@ -3632,6 +3632,8 @@
   "13087312bc6a0b45": "Pull requests",
   "efb65f53a2382026": "Remover créditos de agentes ao mesclar",
   "88631d9ea293eccd": "Remove os créditos de agentes reconhecidos das mensagens de merge e squash nos hosts que oferecem suporte, mantendo os coautores humanos. Inclui o auto-merge. Exclui merge queues, merges de stack e commits existentes.",
+  "57b7f33c7362b0c3": "Register pull request chains as stacks",
+  "08c67ce52d486325": "Register a chain of linked pull requests, each based on the one below it, as a stack on hosts that support stacks, so reviewers see it there. Adds only; existing stacks are left alone.",
   "15ed472fb3ba4a6d": "Branch padrão",
   "abe5615aea30066d": "Fazer pull automaticamente",
   "17782375efd2c928": "Mantém o branch padrão atualizado quando não há alterações locais.",

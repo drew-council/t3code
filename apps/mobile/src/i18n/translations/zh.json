@@ -3634,6 +3634,8 @@
   "13087312bc6a0b45": "PR",
   "efb65f53a2382026": "合并时移除智能体署名",
   "88631d9ea293eccd": "在支持的托管平台上，从合并和压缩合并的提交信息中移除可识别的智能体署名，保留人类共同作者。包括自动合并。不包括合并队列、堆叠合并和已有提交。",
+  "57b7f33c7362b0c3": "Register pull request chains as stacks",
+  "08c67ce52d486325": "Register a chain of linked pull requests, each based on the one below it, as a stack on hosts that support stacks, so reviewers see it there. Adds only; existing stacks are left alone.",
   "15ed472fb3ba4a6d": "默认分支",
   "abe5615aea30066d": "自动拉取",
   "17782375efd2c928": "没有本地更改时保持默认分支为最新。",

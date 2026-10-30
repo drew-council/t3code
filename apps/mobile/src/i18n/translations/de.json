@@ -3637,6 +3637,8 @@
   "13087312bc6a0b45": "Pull Requests",
   "efb65f53a2382026": "Agenten-Credits beim Mergen entfernen",
   "88631d9ea293eccd": "Erkannte Agenten-Credits aus Merge- und Squash-Nachrichten entfernen, sofern der Host das unterstützt; menschliche Co-Autoren bleiben erhalten. Gilt auch für Auto-Merge. Ausgenommen sind Merge-Queues, Stack-Merges und bestehende Commits.",
+  "57b7f33c7362b0c3": "Register pull request chains as stacks",
+  "08c67ce52d486325": "Register a chain of linked pull requests, each based on the one below it, as a stack on hosts that support stacks, so reviewers see it there. Adds only; existing stacks are left alone.",
   "15ed472fb3ba4a6d": "Standard-Branch",
   "abe5615aea30066d": "Automatisch pullen",
   "17782375efd2c928": "Den Standard-Branch aktuell halten, wenn es keine lokalen Änderungen gibt.",

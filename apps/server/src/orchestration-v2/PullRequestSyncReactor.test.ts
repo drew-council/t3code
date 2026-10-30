@@ -42,6 +42,7 @@ import { TestClock } from "effect/testing";
 import * as GitManager from "../git/GitManager.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import * as PullRequestService from "../pullRequest/PullRequestService.ts";
+import * as ServerSettings from "../serverSettings.ts";
 import * as ServerActivation from "../serverActivation.ts";
 import * as VcsProcess from "../vcs/VcsProcess.ts";
 import * as Orchestrator from "./Orchestrator.ts";
@@ -190,6 +191,7 @@ interface HarnessOptions {
     input: PullRequestRef,
   ) => Effect.Effect<PullRequestStack | null, PullRequestOperationError>;
   readonly onSync?: (command: SyncCommand) => Effect.Effect<unknown>;
+  readonly registerChains?: boolean;
 }
 
 const makeHarness = Effect.fn("makePullRequestSyncHarness")(function* (options: HarnessOptions) {
@@ -202,6 +204,7 @@ const makeHarness = Effect.fn("makePullRequestSyncHarness")(function* (options: 
   const reopenCommands = yield* Queue.unbounded<ChecksReopenCommand>();
   const summaryCalls = yield* Ref.make<ReadonlyArray<PullRequestRef>>([]);
   const stackCalls = yield* Ref.make<ReadonlyArray<PullRequestRef>>([]);
+  const createdStacks = yield* Ref.make<ReadonlyArray<ReadonlyArray<number>>>([]);
   const domainEvents = yield* Queue.unbounded<OrchestrationV2DomainEvent>();
   const stateChanges = yield* Queue.unbounded<ThreadPullRequestKey>();
 
@@ -250,6 +253,10 @@ const makeHarness = Effect.fn("makePullRequestSyncHarness")(function* (options: 
       stack,
       invalidate: options.invalidate ?? (() => Effect.void),
       subscribeStateChanges: Effect.succeed(Stream.fromQueue(stateChanges)),
+      createStack: (input) => Ref.update(createdStacks, (stacks) => [...stacks, input.numbers]),
+    }),
+    ServerSettings.layerTest({
+      registerPullRequestChainsAsStacks: options.registerChains ?? false,
     }),
     Layer.mock(GitManager.GitManager)({
       subscribePullRequestStateChanges: Effect.succeed(Stream.empty),
@@ -303,6 +310,7 @@ const makeHarness = Effect.fn("makePullRequestSyncHarness")(function* (options: 
     reopenCommands,
     summaryCalls,
     stackCalls,
+    createdStacks,
     domainEvents,
     stateChanges,
     layer: PullRequestSyncReactor.layer.pipe(Layer.provide(layerDependencies)),
@@ -715,6 +723,42 @@ describe("PullRequestSyncReactor", () => {
         assert.strictEqual(yield* Ref.get(fixture.shellSnapshotReads), 0);
       }).pipe(Effect.provide(fixture.layer));
     }),
+  );
+
+  it.effect.each([
+    { registerChains: true, created: [[1, 2]] },
+    { registerChains: false, created: [] },
+  ])(
+    "registers a linked chain as a host stack when enabled ($registerChains)",
+    ({ registerChains, created }) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          yield* TestClock.setTime(Date.parse(NOW));
+          const layers = { 1: ["layer-1", "main"], 2: ["layer-2", "layer-1"] } as const;
+          const fixture = yield* makeHarness({
+            registerChains,
+            snapshot: makeSnapshot([
+              makeThread("chain", {
+                pullRequests: [
+                  makeLink(2, { headBranch: "layer-2", baseBranch: "layer-1" }),
+                  makeLink(1, { headBranch: "layer-1", baseBranch: "main" }),
+                ],
+              }),
+            ]),
+            summary: (input) => {
+              const [headBranch, baseBranch] = layers[input.number as 1 | 2];
+              return Effect.succeed(makeSummary(input, { headBranch, baseBranch }));
+            },
+          });
+
+          yield* Effect.gen(function* () {
+            const reactor = yield* startAndSweep(fixture);
+            yield* sweepAgain(fixture, reactor);
+
+            assert.deepStrictEqual(yield* Ref.get(fixture.createdStacks), created);
+          }).pipe(Effect.provide(fixture.layer));
+        }),
+      ),
   );
 
   it.effect("asks the host once for a pull request shared by two threads in one project", () =>

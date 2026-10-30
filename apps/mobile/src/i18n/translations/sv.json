@@ -3638,6 +3638,8 @@
   "13087312bc6a0b45": "Pull requests",
   "efb65f53a2382026": "Ta bort agentmedförfattare vid merge",
   "88631d9ea293eccd": "Ta bort igenkända agentmedförfattare från merge- och squash-meddelanden hos värdar som stöder det, och behåll mänskliga medförfattare. Gäller även automatisk merge. Gäller inte merge-köer, stack-merges och befintliga commits.",
+  "57b7f33c7362b0c3": "Register pull request chains as stacks",
+  "08c67ce52d486325": "Register a chain of linked pull requests, each based on the one below it, as a stack on hosts that support stacks, so reviewers see it there. Adds only; existing stacks are left alone.",
   "15ed472fb3ba4a6d": "Standardgren",
   "abe5615aea30066d": "Pulla automatiskt",
   "17782375efd2c928": "Håll standardgrenen aktuell när det inte finns några lokala ändringar.",
