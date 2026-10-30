@@ -1,3 +1,4 @@
+import { getClientSettings } from "~/hooks/useSettings";
 import { readLocalApi } from "~/localApi";
 
 let pendingConfirmations = 0;
@@ -10,7 +11,7 @@ export async function confirmTerminalClose(
   labels: readonly [string, ...string[]],
 ): Promise<boolean> {
   const localApi = readLocalApi();
-  if (!localApi) return true;
+  if (!localApi || !getClientSettings().confirmTerminalClose) return true;
   pendingConfirmations += 1;
   try {
     return await localApi.dialogs.confirm(
