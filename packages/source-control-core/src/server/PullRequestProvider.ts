@@ -395,6 +395,11 @@ export interface PullRequestProviderApi {
     input: ProviderRepositoryRef & { readonly includeDetails?: boolean; readonly number: number },
   ) => Effect.Effect<ProviderChangeRequestStack | null, PullRequestProviderError>;
 
+  /** Numbers run bottom to top. */
+  readonly createChangeRequestStack?: (
+    input: ProviderRepositoryRef & { readonly numbers: ReadonlyArray<number> },
+  ) => Effect.Effect<void, PullRequestProviderError>;
+
   readonly getChangeRequestActivity: (
     input: ProviderRepositoryRef & { readonly number: number },
   ) => Effect.Effect<ProviderChangeRequestActivity, PullRequestProviderError>;

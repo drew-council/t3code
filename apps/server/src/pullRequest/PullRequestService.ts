@@ -200,6 +200,10 @@ export class PullRequestService extends Context.Service<
       input: PullRequestRef,
       options?: { readonly includeDetails?: boolean },
     ) => Effect.Effect<PullRequestStack | null, PullRequestError>;
+    /** Registers open pull requests, bottom to top, as one stack on hosts that have stacks. */
+    readonly createStack: (
+      input: Omit<PullRequestRef, "number"> & { readonly numbers: ReadonlyArray<number> },
+    ) => Effect.Effect<void, PullRequestError>;
     readonly subscribeMerges: Effect.Effect<
       Stream.Stream<PullRequestMergeEvent>,
       never,
@@ -556,6 +560,11 @@ function withRateLimitBackoff(
     ...(api.getChangeRequestStack === undefined
       ? {}
       : { getChangeRequestStack: wrap("getChangeRequestStack", api.getChangeRequestStack) }),
+    ...(api.createChangeRequestStack === undefined
+      ? {}
+      : {
+          createChangeRequestStack: wrap("createChangeRequestStack", api.createChangeRequestStack),
+        }),
     ...(api.getChangeRequestWatchFingerprint === undefined
       ? {}
       : {
@@ -1736,6 +1745,20 @@ export const make = Effect.gen(function* () {
                 },
           ),
         );
+      }),
+    );
+
+  const createStackUncached: PullRequestService["Service"]["createStack"] = (input) =>
+    requireProject({ ...input, number: input.numbers[0] ?? 1 }).pipe(
+      Effect.flatMap((project) => {
+        const create = project.api.createChangeRequestStack;
+        if (create === undefined) return Effect.void;
+        return create({
+          cwd: project.project.workspaceRoot,
+          repository: project.repository,
+          host: project.host,
+          numbers: input.numbers,
+        }).pipe(Effect.mapError(toPullRequestError("createStack")));
       }),
     );
 
@@ -3715,6 +3738,17 @@ export const make = Effect.gen(function* () {
     }),
     summary: credentialCached(summary),
     stack: credentialCached(stack),
+    createStack: Effect.fn("PullRequestService.createStack")((input) =>
+      createStackUncached(input).pipe(
+        Effect.ensuring(
+          Effect.forEach(
+            input.numbers,
+            (number) => invalidate({ reference: { ...input, number } }),
+            { discard: true },
+          ),
+        ),
+      ),
+    ),
     subscribeMerges: PubSub.subscribe(mergedPullRequests).pipe(
       Effect.map((subscription) => Stream.fromSubscription(subscription)),
     ),

@@ -570,4 +570,199 @@ describe("ThreadPullRequestServiceV2 reads", () => {
         }),
       ),
   );
+
+  const gitHubIdentity = {
+    canonicalKey: "github.com/acme/project",
+    locator: {
+      source: "git-remote" as const,
+      remoteName: "origin",
+      remoteUrl: "git@github.com:acme/project.git",
+    },
+    provider: SourceControlProviderKind.make("github"),
+    owner: "acme",
+    name: "project",
+  };
+
+  const runService = (input: {
+    readonly thread: OrchestrationV2ThreadShell;
+    readonly checkedOut?: string;
+    readonly stacked?: boolean;
+    readonly events?: ReadonlyArray<OrchestrationV2DomainEvent>;
+  }) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const project: OrchestrationProjectShell = {
+          id: input.thread.projectId,
+          title: "Project",
+          workspaceRoot: "/workspace/project",
+          defaultModelSelection: null,
+          scripts: [],
+          createdAt: "2026-08-01T00:00:00.000Z",
+          updatedAt: "2026-08-01T00:00:00.000Z",
+        };
+        const activation = yield* Deferred.make<void>();
+        const sweepStarted = yield* Deferred.make<void>();
+        const commands: Array<OrchestrationV2ServerCommand> = [];
+        const dependencies = Layer.mergeAll(
+          Layer.mock(Orchestrator.OrchestratorV2)({
+            streamDomainEvents: Stream.fromIterable(input.events ?? []),
+            getPullRequestSnapshot: () =>
+              Deferred.succeed(sweepStarted, undefined).pipe(
+                Effect.as({
+                  schemaVersion: 2,
+                  snapshotSequence: 1,
+                  threads: [input.thread],
+                  archivedThreads: [],
+                }),
+              ),
+            dispatch: (command) =>
+              Effect.sync(() => {
+                commands.push(command);
+                return { sequence: 2, storedEvents: [] };
+              }),
+          }),
+          Layer.mock(ProjectStore.ProjectStoreV2)({
+            listShells: () => Effect.succeed([project]),
+            getShell: () => Effect.succeedSome(project),
+          }),
+          Layer.mock(GitManager.GitManager)({
+            invalidateLocalStatus: () => Effect.void,
+            localStatus: () =>
+              Effect.succeed({
+                isRepo: true,
+                hasPrimaryRemote: true,
+                isDefaultRef: false,
+                refName: input.checkedOut ?? input.thread.branch,
+                hasWorkingTreeChanges: false,
+                workingTree: { files: [], insertions: 0, deletions: 0 },
+              }),
+            branchPullRequest: ({ branch }) =>
+              Effect.succeed({
+                number: 7,
+                title: "Layer",
+                url: "https://github.com/acme/project/pull/7",
+                baseRef: "main",
+                headRef: branch,
+                state: "open" as const,
+                repositoryKey: "github.com/acme/project",
+                updatedAt: null,
+              }),
+          }),
+          Layer.mock(PullRequestService.PullRequestService)({
+            stack: () =>
+              Effect.succeed(
+                input.stacked === true
+                  ? {
+                      id: "stack-1",
+                      number: 3,
+                      url: "https://github.com/acme/project/stack/3",
+                      base: "main",
+                      layers: [],
+                    }
+                  : null,
+              ),
+          }),
+          Layer.mock(RepositoryIdentityResolver.RepositoryIdentityResolver)({
+            resolve: () => Effect.succeed(gitHubIdentity),
+          }),
+          Layer.mock(BackgroundPolicy.BackgroundPolicy)({}),
+          Layer.succeed(ServerActivation.ServerActivation, Deferred.await(activation)),
+          Layer.succeed(
+            SecureRandom.SecureRandom,
+            SecureRandom.make((size) => new Uint8Array(size).fill(1)),
+          ),
+          FileSystem.layerNoop({}),
+          Path.layer,
+        );
+        yield* Effect.gen(function* () {
+          const service = yield* ThreadPullRequestService.make;
+          yield* service.start();
+          yield* Deferred.succeed(activation, undefined);
+          yield* Deferred.await(sweepStarted);
+          yield* service.drain;
+        }).pipe(Effect.provide(dependencies));
+        return { commands };
+      }),
+    );
+
+  it.effect("follows a worktree checkout when a run ends", () =>
+    Effect.gen(function* () {
+      const thread = {
+        ...threadShell("stack-thread"),
+        branch: "drew/layer-1",
+        worktreePath: "/workspace/stack",
+      };
+
+      const { commands } = yield* runService({
+        thread,
+        checkedOut: "drew/layer-2",
+        events: [
+          {
+            type: "run.updated",
+            threadId: thread.id,
+            payload: { status: "completed" },
+          } as OrchestrationV2DomainEvent,
+        ],
+      });
+
+      expect(commands).toContainEqual(
+        expect.objectContaining({
+          type: "thread.metadata.update",
+          threadId: thread.id,
+          branch: "drew/layer-2",
+          expectedBranch: "drew/layer-1",
+          expectedWorktreePath: "/workspace/stack",
+        }),
+      );
+      expect(commands.filter((command) => command.type === "thread.metadata.update")).toHaveLength(
+        1,
+      );
+    }),
+  );
+
+  it.effect.each([
+    { case: "a stacked PR with nothing linked", stacked: true, pullRequests: [], links: 1 },
+    { case: "an unstacked PR", stacked: false, pullRequests: [], links: 0 },
+    {
+      case: "a thread whose user unlinked a layer",
+      stacked: true,
+      pullRequests: [
+        {
+          host: "github.com",
+          repository: "acme/project",
+          number: 7,
+          url: "https://github.com/acme/project/pull/7",
+          source: "stack-dismissed" as const,
+          linkedAt: "2026-09-19T00:00:00.000Z",
+          snapshot: null,
+          stack: null,
+        },
+      ],
+      links: 0,
+    },
+  ])(
+    "links the branch PR of $case only when it starts a native stack",
+    ({ stacked, pullRequests, links }) =>
+      Effect.gen(function* () {
+        const thread = {
+          ...threadShell("stack-link-thread"),
+          branch: "drew/layer-2",
+          worktreePath: "/workspace/stack",
+          pullRequests,
+        };
+
+        const { commands } = yield* runService({ thread, stacked });
+
+        const linked = commands.filter((command) => command.type === "thread.pull-request.link");
+        expect(linked).toHaveLength(links);
+        if (links > 0) {
+          expect(linked[0]).toMatchObject({
+            threadId: thread.id,
+            repository: "acme/project",
+            number: 7,
+            source: "stack",
+          });
+        }
+      }),
+  );
 });

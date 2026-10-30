@@ -65,7 +65,11 @@ const PAGE_PROJECT_KEYS: Record<SettingsPage, readonly ProjectScopedServerSettin
     "sidebarAutoSettleOnMerge",
     "sidebarAutoSettleAfterDays",
   ],
-  "source-control": ["defaultAutoPull", "removeAgentCreditsOnMerge"],
+  "source-control": [
+    "defaultAutoPull",
+    "removeAgentCreditsOnMerge",
+    "registerPullRequestChainsAsStacks",
+  ],
   worktrees: [
     "newWorktreesStartFromOrigin",
     "worktreeSubmodules",
@@ -424,6 +428,14 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                       value={uniform("removeAgentCreditsOnMerge")}
                       disabled={disabledFor("removeAgentCreditsOnMerge")}
                       onValueChange={(value) => write({ removeAgentCreditsOnMerge: value })}
+                    />
+                    <SettingsSwitchRow
+                      icon={PullRequestGlyph.stack}
+                      label="Register pull request chains as stacks"
+                      subtitle="Register a chain of linked pull requests, each based on the one below it, as a stack on hosts that support stacks, so reviewers see it there. Adds only; existing stacks are left alone."
+                      value={uniform("registerPullRequestChainsAsStacks")}
+                      disabled={disabledFor("registerPullRequestChainsAsStacks")}
+                      onValueChange={(value) => write({ registerPullRequestChainsAsStacks: value })}
                     />
                   </SettingsSection>
                   <SettingsSection title="Default branch">
