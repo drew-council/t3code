@@ -198,6 +198,7 @@ import {
   ComposerRestingImagePreviews,
 } from "./ComposerAttachmentStrip";
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
+import { ComposerVoiceInputButton } from "./ComposerVoiceInputButton";
 import { ComposerFooterPrimaryActions } from "./ComposerFooterControls";
 import { ComposerPendingUserInputPanel } from "./ComposerPendingUserInputPanel";
 import { ComposerPlanFollowUpBanner } from "./ComposerPlanFollowUpBanner";
@@ -3086,6 +3087,30 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       focusComposer={focusComposer}
     />
   ) : null;
+  const voiceInputOwnerKey = `${composerDraftTargetKey}:${activePendingProgress?.activeQuestion?.id ?? ""}`;
+  const readVoiceInputDraftStable = useStableCallback(() => ({
+    ownerKey: voiceInputOwnerKey,
+    text: promptRef.current,
+    selection: composerEditorRef.current?.readSelectionRange() ?? {
+      start: promptRef.current.length,
+      end: promptRef.current.length,
+    },
+    revision: 0,
+  }));
+  const commitVoiceInputDraftStable = useStableCallback(
+    (text: string, selection: { readonly start: number }) => {
+      applyPromptReplacement(0, promptRef.current.length, text, {
+        expandedCursorAfterReplace: selection.start,
+      });
+    },
+  );
+  const composerVoiceInputButton = isChoiceOnlyPendingQuestion ? null : (
+    <ComposerVoiceInputButton
+      key={voiceInputOwnerKey}
+      readDraft={readVoiceInputDraftStable}
+      commitDraft={commitVoiceInputDraftStable}
+    />
+  );
   return (
     <form
       ref={composerFormRef}
@@ -3447,6 +3472,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   >
                     {composerControls}
                   </div>
+                  {composerVoiceInputButton}
                   <ComposerFooterPrimaryActions
                     compact={isComposerPrimaryActionsCompact}
                     canOperateThread={canOperateThread}
