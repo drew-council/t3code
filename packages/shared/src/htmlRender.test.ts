@@ -4,6 +4,7 @@ import {
   injectHtmlRenderBootstrap,
   readHtmlRenderImageRequest,
   readHtmlRenderLinkRequest,
+  readHtmlRenderSelection,
 } from "./htmlRender.ts";
 import { htmlRenderFromToolItem } from "./toolOutput.ts";
 
@@ -115,6 +116,30 @@ describe("readHtmlRenderImageRequest", () => {
     expect(readHtmlRenderImageRequest(image({ src: "javascript:alert(1)" }))).toBeUndefined();
     expect(readHtmlRenderImageRequest(image({ src: "data:text/html,<p>" }))).toBeUndefined();
     expect(readHtmlRenderImageRequest(image({ src: "blob:null/1" }))).toBeUndefined();
+  });
+});
+
+describe("readHtmlRenderSelection", () => {
+  it("reads trimmed text with a finite rect and treats blank text as cleared", () => {
+    const selection = (params: unknown) => ({
+      jsonrpc: "2.0",
+      method: "t3/notifications/selection",
+      params,
+    });
+    const rect = { left: 1, top: 2, right: 30, bottom: 18 };
+    expect(readHtmlRenderSelection(selection({ text: " Revenue\n", rect }))).toEqual({
+      text: "Revenue",
+      rect,
+    });
+    expect(readHtmlRenderSelection(selection({ text: " \n", rect: null }))).toEqual({
+      text: "",
+      rect: null,
+    });
+    expect(readHtmlRenderSelection(selection({ text: "a", rect: null }))).toBeUndefined();
+    expect(
+      readHtmlRenderSelection(selection({ text: "a", rect: { ...rect, left: Infinity } })),
+    ).toBeUndefined();
+    expect(readHtmlRenderSelection(selection({ text: 1, rect }))).toBeUndefined();
   });
 });
 

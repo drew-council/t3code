@@ -16,6 +16,7 @@ import {
   readHtmlRenderImageRequest,
   readHtmlRenderKeyDown,
   readHtmlRenderLinkRequest,
+  readHtmlRenderSelection,
 } from "@t3tools/shared/htmlRender";
 import {
   isMacPlatform,
@@ -138,6 +139,12 @@ function FileDocument(props: { readonly src: string; readonly title: string }) {
   );
 }
 
+/** Text selected inside the page; the rect is the last selected line in client coordinates. */
+export interface HtmlRenderSelection {
+  readonly text: string;
+  readonly rect: DOMRect;
+}
+
 /** Keep the initial URL while mounted; re-signing must not reload the page. */
 export function HtmlRenderDocument(props: {
   readonly src: string;
@@ -147,6 +154,7 @@ export function HtmlRenderDocument(props: {
   readonly onContentHeight?: (height: number) => void;
   /** Reports fullscreen changes so virtualized rows can stay mounted. */
   readonly onFullscreenChange?: ((fullscreen: boolean) => void) | undefined;
+  readonly onSelection?: ((selection: HtmlRenderSelection | null) => void) | undefined;
 }) {
   const theme = useHtmlRenderTheme();
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -247,7 +255,22 @@ export function HtmlRenderDocument(props: {
       props.onContentHeight?.(height);
       return;
     }
-    if (document.activeElement !== frame || navigator.userActivation?.isActive === false) return;
+    const selection = readHtmlRenderSelection(event.data);
+    const active = document.activeElement === frame && navigator.userActivation?.isActive !== false;
+    if (selection !== undefined) {
+      if (selection.rect === null || !active) {
+        props.onSelection?.(null);
+        return;
+      }
+      const { left, top, right, bottom } = selection.rect;
+      const bounds = frame.getBoundingClientRect();
+      props.onSelection?.({
+        text: selection.text,
+        rect: new DOMRect(bounds.left + left, bounds.top + top, right - left, bottom - top),
+      });
+      return;
+    }
+    if (!active) return;
     const linkRequest = readHtmlRenderLinkRequest(event.data);
     if (linkRequest !== undefined) {
       open(linkRequest.url, linkRequest);
