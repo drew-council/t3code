@@ -1110,6 +1110,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     onRespondToApproval,
     citationRequest: readyCitationRequest,
     onReplyToResponse,
+    onCiteAssistantText,
     listRef,
     timestampFormat,
     routeThreadKey,

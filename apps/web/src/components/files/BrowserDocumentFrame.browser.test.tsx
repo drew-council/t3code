@@ -61,6 +61,35 @@ describe("HtmlRenderDocument", () => {
     await expect.element(viewer.getByRole("button", { name: "Next media" })).toBeVisible();
     await expect.element(viewer.getByRole("button", { name: "Previous media" })).toBeVisible();
   });
+
+  it("reports text selected in the page in client coordinates, then its collapse", async () => {
+    const html = injectHtmlRenderBootstrap(
+      `<!doctype html><html><body><p>Revenue grew</p><p>Costs</p></body></html>`,
+    );
+    const src = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+    using _url = { [Symbol.dispose]: () => URL.revokeObjectURL(src) };
+    const onSelection = vi.fn();
+    await using screen = await render(
+      <HtmlRenderDocument src={src} title="Report" onSelection={onSelection} />,
+    );
+    const frame = screen.getByTitle("Report");
+
+    await page.frameLocator(frame).getByText("Revenue grew").tripleClick();
+    await vi.waitFor(() =>
+      expect(onSelection).toHaveBeenLastCalledWith({
+        text: "Revenue grew",
+        rect: expect.any(DOMRect),
+      }),
+    );
+    const { rect } = onSelection.mock.lastCall![0];
+    const bounds = (frame.element() as HTMLIFrameElement).getBoundingClientRect();
+    expect(rect.left).toBeGreaterThanOrEqual(bounds.left);
+    expect(rect.top).toBeGreaterThanOrEqual(bounds.top);
+    expect(rect.width).toBeGreaterThan(0);
+
+    await page.frameLocator(frame).getByText("Costs").click();
+    await vi.waitFor(() => expect(onSelection).toHaveBeenLastCalledWith(null));
+  });
 });
 
 it("keeps the chat in place when a label far from its hidden radio is clicked", async () => {

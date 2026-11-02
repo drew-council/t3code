@@ -1,4 +1,4 @@
-import type { EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
+import type { AssistantCitation, EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
 import {
   HTML_RENDER_COLUMN_WIDTH,
   htmlRenderFileName,
@@ -12,11 +12,14 @@ import { useEffect, useState } from "react";
 import { useAssetUrlRefresh } from "~/assets/assetUrls";
 import { useLongLivedAssetUrl } from "~/assets/longLivedAssetUrls";
 
-import { HtmlRenderDocument } from "../files/BrowserDocumentFrame";
+import type { AssistantCitationSourceAnchor } from "~/lib/assistantTextSelection";
+
+import { HtmlRenderDocument, type HtmlRenderSelection } from "../files/BrowserDocumentFrame";
 import { Button } from "../ui/button";
 import { toastManager } from "../ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { HtmlRenderDialog } from "./HtmlRenderDialog";
+import { HtmlRenderSelectionToolbar } from "./HtmlRenderSelectionToolbar";
 import { observeResize } from "~/lib/observeResize";
 
 const MIN_URL_LIFE_MS = 5 * 60_000;
@@ -39,6 +42,11 @@ export function HtmlRenderFrame(props: {
   readonly htmlRender: HtmlRenderReference;
   readonly threadRef: ScopedThreadRef | undefined;
   readonly onFullscreenChange?: (fullscreen: boolean) => void;
+  /** Set with `citationSourceId` to let readers cite text selected in the page. */
+  readonly onCite?:
+    | ((citation: AssistantCitation, sourceAnchor: AssistantCitationSourceAnchor) => boolean)
+    | undefined;
+  readonly citationSourceId?: string | undefined;
 }) {
   const gt = useGT();
   const { attachmentId, title } = props.htmlRender;
@@ -72,7 +80,9 @@ export function HtmlRenderFrame(props: {
   const failed = loaded === null && assetUrl._tag === "Failure";
   const refresh = useAssetUrlRefresh(props.environmentId, resource);
   const [expandedSrc, setExpandedSrc] = useState<string | null>(null);
-  const { onFullscreenChange } = props;
+  const [selection, setSelection] = useState<HtmlRenderSelection | null>(null);
+  const { onFullscreenChange, onCite, citationSourceId, threadRef } = props;
+  const citable = onCite !== undefined && citationSourceId !== undefined && threadRef !== undefined;
   // Tied to the viewer's lifetime: unmounting while expanded must still release
   // the timeline's follow pin, which a close handler alone never reaches.
   const expanded = expandedSrc !== null;
@@ -98,7 +108,17 @@ export function HtmlRenderFrame(props: {
               setContentHeight(height);
             }}
             onFullscreenChange={onFullscreenChange}
+            onSelection={citable ? setSelection : undefined}
           />
+          {citable ? (
+            <HtmlRenderSelectionToolbar
+              selection={selection}
+              sourceId={citationSourceId}
+              threadRef={threadRef}
+              onCite={onCite}
+              onDismiss={() => setSelection(null)}
+            />
+          ) : null}
           <div className="absolute end-2 top-2 flex gap-1 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/html-render:opacity-100 pointer-coarse:opacity-100">
             <Tooltip>
               <TooltipTrigger

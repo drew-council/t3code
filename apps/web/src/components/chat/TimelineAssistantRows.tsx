@@ -396,6 +396,8 @@ export function HtmlRenderTimelineRow({
         htmlRender={row.htmlRender}
         threadRef={ctx.threadRef ?? undefined}
         onFullscreenChange={onFullscreenChange}
+        onCite={ctx.onCiteAssistantText}
+        citationSourceId={row.id}
       />
     </div>
   );
