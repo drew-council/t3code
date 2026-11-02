@@ -218,6 +218,7 @@ const fixture = Effect.fn("fixture")(function* (
           })),
         streamChanges: Stream.empty,
         subscribeChanges: Effect.succeed(Stream.empty),
+        setProjectRepositoryKeys: () => Effect.void,
       }),
     ),
   );

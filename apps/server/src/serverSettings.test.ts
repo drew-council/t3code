@@ -240,6 +240,42 @@ it.layer(NodeServices.layer)("server settings", (it) => {
     }).pipe(Effect.provide(layerServerSettings())),
   );
 
+  it.effect("layers repository-keyed overrides under project entries without saving them", () =>
+    Effect.gen(function* () {
+      const config = yield* ServerConfig.ServerConfig;
+      const fs = yield* FileSystem.FileSystem;
+      const service = yield* ServerSettingsModule.ServerSettingsService;
+      const repo = "github.com/acme/app";
+      const projectA = ProjectId.make("project-a");
+      const projectB = ProjectId.make("project-b");
+      const onDisk = {
+        [repo]: { defaultAutoPull: true, defaultThreadEnvMode: "worktree" as const },
+        [projectA]: { defaultThreadEnvMode: "local" as const },
+      };
+      yield* fs.writeFileString(
+        config.settingsPath,
+        JSON.stringify({ projectSettingsFolded: true, projectSettingsOverrides: onDisk }),
+      );
+
+      yield* service.setProjectRepositoryKeys(
+        new Map([
+          [projectA, repo],
+          [projectB, repo],
+        ]),
+      );
+      const settings = yield* service.getSettings;
+
+      assert.deepEqual(settings.projectSettingsOverrides[projectA], {
+        defaultAutoPull: true,
+        defaultThreadEnvMode: "local",
+      });
+      assert.deepEqual(settings.projectSettingsOverrides[projectB], onDisk[repo]);
+      yield* service.updateSettings({ defaultAutoPull: false });
+      const persisted = JSON.parse(yield* fs.readFileString(config.settingsPath));
+      assert.deepEqual(persisted.projectSettingsOverrides, onDisk);
+    }).pipe(Effect.provide(layerServerSettings())),
+  );
+
   it.effect("moves an idle compaction mode saved in the legacy switch to its own field", () =>
     Effect.gen(function* () {
       const config = yield* ServerConfig.ServerConfig;
