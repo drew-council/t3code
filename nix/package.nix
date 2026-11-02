@@ -174,6 +174,19 @@ let
 
       ${stdenv.shell} ${lib.getExe writeDarwinBundle} \
         "$out" "${appName}" t3code-desktop t3code
+
+      # TCC attributes Electron's capture to this bundle and silently denies
+      # services it has no usage description for. Mirrors scripts/build-desktop-artifact.ts.
+      # xcbuild's PlistBuddy takes one command per call.
+      plist="$out/Applications/${appName}.app/Contents/Info.plist"
+      for entry in \
+        "NSMicrophoneUsageDescription string T3 Code lets commands run by terminals and coding agents use the microphone." \
+        "NSCameraUsageDescription string T3 Code lets commands run by terminals and coding agents use the camera." \
+        "NSScreenCaptureUsageDescription string T3 Code captures the active window when you use the window capture shortcut." \
+        "NSLocalNetworkUsageDescription string T3 Code connects to devices on your local network for remote environments and commands run by terminals and coding agents."
+      do
+        PlistBuddy -c "Add :$entry" "$plist"
+      done
     ''
     + ''
       mkdir --parents \
