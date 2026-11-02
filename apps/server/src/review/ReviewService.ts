@@ -15,6 +15,8 @@ import {
   type ReviewDiffPreviewError,
   type ReviewDiffPreviewInput,
   type ReviewDiffPreviewResult,
+  type ReviewGeneratedPathsInput,
+  type ReviewGeneratedPathsResult,
 } from "@t3tools/contracts";
 
 import * as ServerConfig from "../config.ts";
@@ -26,6 +28,7 @@ const WORKSPACE_BOUND_SUBJECTS = {
   "ReviewService.getBranchCommits": "commit list",
   "ReviewService.getDiffPreview": "diff preview",
   "ReviewService.getDiffFileContents": "diff file contents",
+  "ReviewService.getGeneratedPaths": "generated paths",
 } as const;
 
 export class ReviewService extends Context.Service<
@@ -40,6 +43,9 @@ export class ReviewService extends Context.Service<
     readonly getDiffFileContents: (
       input: ReviewDiffFileContentsInput,
     ) => Effect.Effect<ReviewDiffFileContentsResult, ReviewDiffPreviewError>;
+    readonly getGeneratedPaths: (
+      input: ReviewGeneratedPathsInput,
+    ) => Effect.Effect<ReviewGeneratedPathsResult, ReviewDiffPreviewError>;
   }
 >()("t3/review/ReviewService") {}
 
@@ -144,10 +150,21 @@ export const make = Effect.gen(function* () {
     return yield* git.getReviewDiffFileContents(input);
   });
 
+  const getGeneratedPaths: ReviewService["Service"]["getGeneratedPaths"] = Effect.fn(
+    "ReviewService.getGeneratedPaths",
+  )(function* (input) {
+    yield* assertWorkspaceBoundCwd("ReviewService.getGeneratedPaths", input.cwd);
+
+    const handle = yield* vcsRegistry.detect({ cwd: input.cwd, requestedKind: "auto" });
+    if (handle?.kind !== "git") return { generated: {} };
+    return yield* git.getReviewGeneratedPaths(input);
+  });
+
   return ReviewService.of({
     getBranchCommits,
     getDiffPreview,
     getDiffFileContents,
+    getGeneratedPaths,
   });
 });
 

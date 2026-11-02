@@ -390,7 +390,8 @@ it("keeps a linked test file expanded when a refresh changes the rest of the dif
 
   mocks.refreshed = true;
   await screen.rerender(tab(1));
-  await expect.element(screen.getByText("4 files", { exact: true })).toBeVisible();
+  // early-2.generated.ts stays hidden by default.
+  await expect.element(screen.getByText("3 files", { exact: true })).toBeVisible();
   await expect.element(testLine).toBeVisible();
 });
 
@@ -449,7 +450,7 @@ it("keeps a later test file folded by hand through a refresh and bulk toggles wh
 
   // A refresh drops the loaded later page, so the bulk toggles below run without it.
   await screen.rerender(tab(1));
-  await expect.element(screen.getByText("1 test file hidden", { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("1 file hidden", { exact: true })).toBeVisible();
   await screen.getByRole("button", { name: "Collapse all files", exact: true }).click();
   await screen.getByRole("button", { name: "Expand all files", exact: true }).click();
   await loadNextPage();

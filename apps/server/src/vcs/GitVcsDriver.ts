@@ -37,6 +37,8 @@ import {
   type VcsStatusInput,
   type VcsStatusResult,
   type WorktreeSubmodules,
+  type ReviewGeneratedPathsInput,
+  type ReviewGeneratedPathsResult,
 } from "@t3tools/contracts";
 import { isMissingExecutable } from "@t3tools/source-control-core/server/discovery";
 import * as HostProcess from "@t3tools/shared/HostProcess";
@@ -375,6 +377,9 @@ export class GitVcsDriver extends Context.Service<
     readonly getReviewDiffFileContents: (
       input: ReviewDiffFileContentsInput,
     ) => Effect.Effect<ReviewDiffFileContentsResult, GitCommandError>;
+    readonly getReviewGeneratedPaths: (
+      input: ReviewGeneratedPathsInput,
+    ) => Effect.Effect<ReviewGeneratedPathsResult, GitCommandError>;
     readonly readConfigValue: (
       cwd: string,
       key: string,
