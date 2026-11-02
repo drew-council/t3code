@@ -12,6 +12,7 @@ import {
   CheckIcon,
   ChevronDownIcon,
   Columns2Icon,
+  FileCogIcon,
   FlaskConicalOffIcon,
   FolderTreeIcon,
   PilcrowIcon,
@@ -41,6 +42,7 @@ import {
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { isTestChangedFile } from "@t3tools/shared/changedFileKind";
 import { useHideTestFiles } from "./diffs/useHideTestFiles";
+import { useHideGeneratedFiles, useIsGeneratedFile } from "./diffs/useGeneratedFiles";
 import { useRenderedAppearance } from "../hooks/useTheme";
 import { useStableCallback } from "../hooks/useStableCallback";
 import {
@@ -226,6 +228,7 @@ export default function DiffPanel({
     Schema.Boolean,
   );
   const [hideTestFiles, setHideTestFiles] = useHideTestFiles();
+  const [hideGeneratedFiles, setHideGeneratedFiles] = useHideGeneratedFiles();
   const [baseRefQuery, setBaseRefQuery] = useState("");
   // The open commit menu keeps the list it opened with, so rows do not move under the pointer.
   const [openCommitMenu, setOpenCommitMenu] = useState<ReviewBranchCommitsResult | null>(null);
@@ -606,13 +609,20 @@ export default function DiffPanel({
   const isRefreshingDiff = branchDiffPreview.isPending || areFilePatchesPending;
   const renderableFileEntries = renderableFiles.map(getCachedFileEntry);
   const diffFileKeys = renderableFileEntries.map((file) => file.fileKey);
-  const testFileCount = renderableFiles.filter((file) =>
-    isTestChangedFile(resolveFileDiffPath(file)),
-  ).length;
+  const renderablePaths = renderableFiles.map(resolveFileDiffPath);
+  const isGeneratedFile = useIsGeneratedFile({
+    environmentId: activeThread?.environmentId,
+    cwd: activeCwd,
+    paths: renderablePaths,
+  });
+  const testFileCount = renderablePaths.filter(isTestChangedFile).length;
+  const generatedFileCount = renderablePaths.filter(isGeneratedFile).length;
   // Hiding is display-only: lazy loading indexes into the full list. A requested file stays visible.
   const isFileShown = (file: FileDiffMetadata) => {
     const path = resolveFileDiffPath(file);
-    return !hideTestFiles || path === selectedFilePath || !isTestChangedFile(path);
+    if (path === selectedFilePath) return true;
+    if (hideTestFiles && isTestChangedFile(path)) return false;
+    return !hideGeneratedFiles || !isGeneratedFile(path);
   };
   const shownFileEntries = renderableFileEntries.filter(({ fileDiff }) => isFileShown(fileDiff));
   const shownFileKeys = shownFileEntries.map((file) => file.fileKey);
@@ -1218,6 +1228,28 @@ export default function DiffPanel({
               {hideTestFiles
                 ? `Show ${testFileCount} hidden test ${testFileCount === 1 ? "file" : "files"}`
                 : "Hide test files"}
+            </TooltipPopup>
+          </Tooltip>
+        )}
+        {generatedFileCount > 0 && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Toggle
+                  aria-label="Hide generated files"
+                  variant="ghost"
+                  size="sm"
+                  pressed={hideGeneratedFiles}
+                  onPressedChange={(pressed) => setHideGeneratedFiles(Boolean(pressed))}
+                />
+              }
+            >
+              <FileCogIcon className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipPopup side="top">
+              {hideGeneratedFiles
+                ? `Show ${generatedFileCount} hidden generated ${generatedFileCount === 1 ? "file" : "files"}`
+                : "Hide generated files"}
             </TooltipPopup>
           </Tooltip>
         )}

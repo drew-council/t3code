@@ -1529,6 +1529,30 @@ it.layer(layerTest)("GitVcsDriver core integration", (it) => {
       }),
     );
 
+    it.effect("reads linguist-generated from .gitattributes relative to the repository root", () =>
+      Effect.gen(function* () {
+        const cwd = yield* makeTmpDir();
+        yield* initRepoWithCommit(cwd);
+        const driver = yield* GitVcsDriver.GitVcsDriver;
+        yield* writeTextFile(
+          cwd,
+          ".gitattributes",
+          "gen/** linguist-generated\nkeep.lock -linguist-generated\nschema.ts linguist-generated=true\n",
+        );
+        yield* writeTextFile(cwd, "sub/.keep", "");
+
+        const result = yield* driver.getReviewGeneratedPaths({
+          cwd: `${cwd}/sub`,
+          paths: ["gen/api.ts", "keep.lock", "schema.ts", "src/app.ts"],
+        });
+        assert.deepStrictEqual(result.generated, {
+          "gen/api.ts": true,
+          "keep.lock": false,
+          "schema.ts": true,
+        });
+      }),
+    );
+
     it.effect("previews one selected commit, a merge against its first parent", () =>
       Effect.gen(function* () {
         const cwd = yield* makeTmpDir();

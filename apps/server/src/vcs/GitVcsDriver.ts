@@ -26,6 +26,8 @@ import {
   type ReviewDiffPreviewResult,
   type ReviewDiffFileContentsInput,
   type ReviewDiffFileContentsResult,
+  type ReviewGeneratedPathsInput,
+  type ReviewGeneratedPathsResult,
   type VcsInitInput,
   type VcsListRefsInput,
   type VcsListRefsResult,
@@ -339,6 +341,9 @@ export class GitVcsDriver extends Context.Service<
     readonly getReviewDiffFileContents: (
       input: ReviewDiffFileContentsInput,
     ) => Effect.Effect<ReviewDiffFileContentsResult, GitCommandError>;
+    readonly getReviewGeneratedPaths: (
+      input: ReviewGeneratedPathsInput,
+    ) => Effect.Effect<ReviewGeneratedPathsResult, GitCommandError>;
     readonly readConfigValue: (
       cwd: string,
       key: string,

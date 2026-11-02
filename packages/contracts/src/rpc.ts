@@ -156,6 +156,8 @@ import {
   ReviewDiffPreviewError,
   ReviewDiffPreviewInput,
   ReviewDiffPreviewResult,
+  ReviewGeneratedPathsInput,
+  ReviewGeneratedPathsResult,
 } from "./review.ts";
 import { KeybindingsConfigError } from "./keybindings.ts";
 import { OrchestrationSearchThreadsError } from "./threadSearch.ts";
@@ -460,6 +462,7 @@ export const WS_METHODS = {
   reviewGetBranchCommits: "review.getBranchCommits",
   reviewGetDiffPreview: "review.getDiffPreview",
   reviewGetDiffFileContents: "review.getDiffFileContents",
+  reviewGetGeneratedPaths: "review.getGeneratedPaths",
 
   terminalOpen: "terminal.open",
   terminalAttach: "terminal.attach",
@@ -1521,6 +1524,12 @@ const WsReviewGetDiffFileContentsRpc = Rpc.make(WS_METHODS.reviewGetDiffFileCont
   error: Schema.Union([ReviewDiffPreviewError, EnvironmentAuthorizationError]),
 });
 
+const WsReviewGetGeneratedPathsRpc = Rpc.make(WS_METHODS.reviewGetGeneratedPaths, {
+  payload: ReviewGeneratedPathsInput,
+  success: ReviewGeneratedPathsResult,
+  error: Schema.Union([ReviewDiffPreviewError, EnvironmentAuthorizationError]),
+});
+
 const WsTerminalOpenRpc = Rpc.make(WS_METHODS.terminalOpen, {
   payload: TerminalOpenInput,
   success: TerminalSessionSnapshot,
@@ -2104,6 +2113,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsReviewGetBranchCommitsRpc,
   WsReviewGetDiffPreviewRpc,
   WsReviewGetDiffFileContentsRpc,
+  WsReviewGetGeneratedPathsRpc,
   WsTerminalOpenRpc,
   WsTerminalAttachRpc,
   WsTerminalObserveRpc,

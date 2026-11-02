@@ -19,6 +19,7 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   Columns2Icon,
+  FileCogIcon,
   FlaskConicalOffIcon,
   FolderTreeIcon,
   InfoIcon,
@@ -83,6 +84,7 @@ import { DiffCommentAnnotation } from "../diffs/DiffCommentAnnotation";
 import { DiffFileTree } from "../diffs/DiffFileTree";
 import { useCodeViewFileReveal } from "../diffs/useCodeViewFileReveal";
 import { useHideTestFiles } from "../diffs/useHideTestFiles";
+import { useHideGeneratedFiles, useIsGeneratedFile } from "../diffs/useGeneratedFiles";
 import { diffFileTreeEntries, orderDiffFilesLikeTree } from "../diffs/diffFileTree.logic";
 import { StyledDiffCodeView } from "../diffs/StyledDiffCodeView";
 import { Button } from "../ui/button";
@@ -311,6 +313,7 @@ function PullRequestCodeTab({
     Schema.Boolean,
   );
   const [hideTestFiles, setHideTestFiles] = useHideTestFiles();
+  const [hideGeneratedFiles, setHideGeneratedFiles] = useHideGeneratedFiles();
   const [selectedLines, setSelectedLines] = useState<{
     id: string;
     range: SelectedLineRange;
@@ -505,17 +508,23 @@ function PullRequestCodeTab({
       parsed?.kind === "files" ? orderDiffFiles(parsed.files) : [],
     ),
   );
-  const testFileCount = loadedFiles.filter((file) =>
-    isTestChangedFile(resolveFileDiffPath(file)),
-  ).length;
-  // A requested file stays visible so a jump to a hidden test still lands.
-  const files = hideTestFiles
-    ? loadedFiles.filter((file) => {
-        const path = resolveFileDiffPath(file);
-        return path === revealRequest?.path || !isTestChangedFile(path);
-      })
-    : loadedFiles;
-  const hiddenTestFileCount = loadedFiles.length - files.length;
+  const loadedPaths = loadedFiles.map(resolveFileDiffPath);
+  const isGeneratedFile = useIsGeneratedFile({
+    environmentId,
+    cwd: detail.workspaceRoot,
+    paths: loadedPaths,
+  });
+  const testFileCount = loadedPaths.filter(isTestChangedFile).length;
+  const generatedFileCount = loadedPaths.filter(isGeneratedFile).length;
+  // A requested file stays visible so a jump to a hidden file still lands.
+  const isHiddenPath = (path: string) =>
+    path !== revealRequest?.path &&
+    ((hideTestFiles && isTestChangedFile(path)) || (hideGeneratedFiles && isGeneratedFile(path)));
+  const files =
+    hideTestFiles || hideGeneratedFiles
+      ? loadedFiles.filter((file) => !isHiddenPath(resolveFileDiffPath(file)))
+      : loadedFiles;
+  const hiddenFileCount = loadedFiles.length - files.length;
   const filePaths = files.map((file) => resolveFileDiffPath(file));
   const omittedFileStats = new Map(
     loadedSlices.flatMap((slice) =>
@@ -1088,9 +1097,17 @@ function PullRequestCodeTab({
             {files.length} {files.length === 1 ? "file" : "files"}
             {nextCursor === null ? "" : "+"}
           </span>
-          {hiddenTestFileCount > 0 ? (
-            <Button type="button" size="xs" variant="link" onClick={() => setHideTestFiles(false)}>
-              {hiddenTestFileCount} test {hiddenTestFileCount === 1 ? "file" : "files"} hidden
+          {hiddenFileCount > 0 ? (
+            <Button
+              type="button"
+              size="xs"
+              variant="link"
+              onClick={() => {
+                setHideTestFiles(false);
+                setHideGeneratedFiles(false);
+              }}
+            >
+              {hiddenFileCount} {hiddenFileCount === 1 ? "file" : "files"} hidden
             </Button>
           ) : null}
           {filesViewed.enabled && files.length > 0 ? (
@@ -1322,6 +1339,26 @@ function PullRequestCodeTab({
             </TooltipTrigger>
             <TooltipPopup side="top">
               {hideTestFiles ? "Show test files" : "Hide test files"}
+            </TooltipPopup>
+          </Tooltip>
+        ) : null}
+        {generatedFileCount > 0 ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Toggle
+                  aria-label="Hide generated files"
+                  variant="ghost"
+                  size="sm"
+                  pressed={hideGeneratedFiles}
+                  onPressedChange={(pressed) => setHideGeneratedFiles(Boolean(pressed))}
+                />
+              }
+            >
+              <FileCogIcon className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipPopup side="top">
+              {hideGeneratedFiles ? "Show generated files" : "Hide generated files"}
             </TooltipPopup>
           </Tooltip>
         ) : null}

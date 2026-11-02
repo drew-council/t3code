@@ -57,6 +57,11 @@ export function createReviewEnvironmentAtoms<R, E>(
       staleTimeMs: 5_000,
     }),
     diffPreview,
+    generatedPaths: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:review:generated-paths",
+      tag: WS_METHODS.reviewGetGeneratedPaths,
+      staleTimeMs: 60_000,
+    }),
     diffFilePatch: createEnvironmentQueryAtomFamily(runtime, {
       label: "environment-data:review:diff-file-patch",
       staleTimeMs: 5 * 60_000,

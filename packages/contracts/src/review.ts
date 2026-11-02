@@ -82,6 +82,18 @@ export const ReviewDiffFileContentsResult = Schema.Struct({
 });
 export type ReviewDiffFileContentsResult = typeof ReviewDiffFileContentsResult.Type;
 
+export const ReviewGeneratedPathsInput = Schema.Struct({
+  cwd: TrimmedNonEmptyString,
+  paths: Schema.Array(Schema.NonEmptyString),
+});
+export type ReviewGeneratedPathsInput = typeof ReviewGeneratedPathsInput.Type;
+
+export const ReviewGeneratedPathsResult = Schema.Struct({
+  /** `linguist-generated` per path; paths the repository leaves unspecified are absent. */
+  generated: Schema.Record(Schema.String, Schema.Boolean),
+});
+export type ReviewGeneratedPathsResult = typeof ReviewGeneratedPathsResult.Type;
+
 export const ReviewDiffPreviewResult = Schema.Struct({
   cwd: TrimmedNonEmptyString,
   generatedAt: Schema.DateTimeUtc,

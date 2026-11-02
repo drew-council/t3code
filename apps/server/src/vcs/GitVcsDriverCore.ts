@@ -28,6 +28,7 @@ import {
   T3_PROJECT_FILE_NAME,
   type ReviewBranchCommitsInput,
   type ReviewDiffFileContentsInput,
+  type ReviewGeneratedPathsInput,
   type ReviewDiffPreviewInput,
   type ReviewDiffFileStat,
   type ReviewDiffPreviewSource,
@@ -3557,6 +3558,32 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     return new TextDecoder("utf-8").decode(bytes);
   });
 
+  const getReviewGeneratedPaths = Effect.fn("getReviewGeneratedPaths")(function* (
+    input: ReviewGeneratedPathsInput,
+  ) {
+    if (input.paths.length === 0) return { generated: {} };
+    // Diff paths are relative to the repository root, and check-attr resolves them against cwd.
+    const repositoryRoot = yield* runGitStdout(
+      "GitVcsDriver.getReviewGeneratedPaths.repositoryRoot",
+      input.cwd,
+      ["rev-parse", "--show-toplevel"],
+    ).pipe(Effect.map((value) => value.trim()));
+    const { stdout } = yield* executeGit(
+      "GitVcsDriver.getReviewGeneratedPaths",
+      repositoryRoot,
+      ["check-attr", "-z", "--stdin", "linguist-generated"],
+      { stdin: `${input.paths.join("\0")}\0`, maxOutputBytes: REVIEW_METADATA_MAX_OUTPUT_BYTES },
+    );
+    const fields = stdout.split("\0");
+    const generated: Array<[string, boolean]> = [];
+    for (let index = 0; index + 2 < fields.length; index += 3) {
+      const value = fields[index + 2];
+      if (value === "set" || value === "true") generated.push([fields[index]!, true]);
+      else if (value === "unset" || value === "false") generated.push([fields[index]!, false]);
+    }
+    return { generated: Object.fromEntries(generated) };
+  });
+
   const getReviewDiffFileContents = Effect.fn("getReviewDiffFileContents")(function* (
     input: ReviewDiffFileContentsInput,
   ) {
@@ -4859,6 +4886,7 @@ export const makeGitVcsDriverCore = Effect.fn("makeGitVcsDriverCore")(function* 
     getReviewBranchCommits,
     getReviewDiffPreview,
     getReviewDiffFileContents,
+    getReviewGeneratedPaths,
     readConfigValue,
     readBranchBase,
     resolveBranchName,

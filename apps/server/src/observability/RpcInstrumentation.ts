@@ -184,6 +184,7 @@ const RPC_AGGREGATES = {
   [WS_METHODS.reviewGetBranchCommits]: "review",
   [WS_METHODS.reviewGetDiffPreview]: "review",
   [WS_METHODS.reviewGetDiffFileContents]: "review",
+  [WS_METHODS.reviewGetGeneratedPaths]: "review",
   [WS_METHODS.terminalOpen]: "terminal",
   [WS_METHODS.terminalAttach]: "terminal",
   [WS_METHODS.terminalObserve]: "terminal",
