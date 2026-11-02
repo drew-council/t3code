@@ -84,6 +84,19 @@ describe("pi T3 MCP injection", () => {
       permissionOnly.env[T3_PI_MCP_EXTENSION_PATH_ENV],
       "/tmp/cache/pi-t3-mcp-extension.ts",
     );
+
+    const autoMode = (autoUsesExtensionReview: boolean | undefined) =>
+      buildPiRpcLaunch({
+        launchArgs: [],
+        environment: {},
+        mcpSession: undefined,
+        extensionPath: "/tmp/cache/pi-t3-mcp-extension.ts",
+        runtimeMode: "auto",
+        ...(autoUsesExtensionReview === undefined ? {} : { autoUsesExtensionReview }),
+      }).env[T3_PI_RUNTIME_MODE_ENV];
+    assert.equal(autoMode(undefined), "approval-required");
+    assert.equal(autoMode(false), "approval-required");
+    assert.equal(autoMode(true), "full-access");
   });
 
   it("forces tools and user extensions off for unattended text generation", () => {

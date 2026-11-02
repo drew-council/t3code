@@ -118,6 +118,7 @@ const settings = {
   enabled: true,
   binaryPath: "pi",
   launchArgs: "",
+  autoUsesExtensionReview: false,
   customModels: [],
 } as const;
 
@@ -145,6 +146,15 @@ describe("PiProvider", () => {
         ["default"],
       );
       assert.include(snapshot.message ?? "", "could not refresh its models and commands");
+      assert.notInclude(snapshot.supportedRuntimeModes ?? [], "auto");
+
+      const reviewed = yield* checkPiProviderStatus({
+        ...settings,
+        autoUsesExtensionReview: true,
+      }).pipe(
+        Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, piProbeSpawner("0.84.3")),
+      );
+      assert.include(reviewed.supportedRuntimeModes ?? [], "auto");
     }).pipe(Effect.provide(NodeServices.layer)),
   );
 
