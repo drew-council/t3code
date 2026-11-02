@@ -35,6 +35,7 @@ import {
   TriangleAlertIcon,
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
+  FileCogIcon,
 } from "lucide-react";
 import { useAtomRefresh } from "@effect/atom-react";
 import * as Schema from "effect/Schema";
@@ -137,6 +138,8 @@ import {
   usePullRequestReviewStore,
   type PendingReviewComment,
 } from "./pullRequestReviewStore";
+
+import { useHideGeneratedFiles, useIsGeneratedFile } from "../diffs/useGeneratedFiles";
 
 interface ReviewAnnotationGroup {
   readonly threads: ReadonlyArray<PullRequestReviewThread>;
@@ -401,6 +404,7 @@ function PullRequestCodeTab({
     Schema.Boolean,
   );
   const [hideTestFiles, setHideTestFiles] = useHideTestFiles();
+  const [hideGeneratedFiles, setHideGeneratedFiles] = useHideGeneratedFiles();
   const [selectedLines, setSelectedLines] = useState<{
     id: string;
     range: SelectedLineRange;
@@ -594,23 +598,30 @@ function PullRequestCodeTab({
         )
       : undefined;
   const pendingLinkPath = linkFile ? resolveFileDiffPath(linkFile) : null;
-  // The linked file stays shown past the test-file filter after the link settles.
+  // The linked file stays shown past the hidden-file filters after the link settles.
   const [revealedLink, setRevealedLink] = useState<{
     readonly scope: string;
     readonly path: string;
   } | null>(null);
   const linkPath = pendingLinkPath ?? (revealedLink?.scope === scopeKey ? revealedLink.path : null);
-  const testFileCount = loadedFiles.filter((file) =>
-    isTestChangedFile(resolveFileDiffPath(file)),
-  ).length;
-  // A requested file stays visible so a jump to a hidden test still lands.
-  const files = hideTestFiles
-    ? loadedFiles.filter((file) => {
-        const path = resolveFileDiffPath(file);
-        return path === revealRequest?.path || path === linkPath || !isTestChangedFile(path);
-      })
-    : loadedFiles;
-  const hiddenTestFileCount = loadedFiles.length - files.length;
+  const loadedPaths = loadedFiles.map(resolveFileDiffPath);
+  const isGeneratedFile = useIsGeneratedFile({
+    environmentId,
+    cwd: detail.workspaceRoot,
+    paths: loadedPaths,
+  });
+  const testFileCount = loadedPaths.filter(isTestChangedFile).length;
+  const generatedFileCount = loadedPaths.filter(isGeneratedFile).length;
+  // A requested file stays visible so a jump to a hidden file still lands.
+  const isHiddenPath = (path: string) =>
+    path !== revealRequest?.path &&
+    path !== linkPath &&
+    ((hideTestFiles && isTestChangedFile(path)) || (hideGeneratedFiles && isGeneratedFile(path)));
+  const files =
+    hideTestFiles || hideGeneratedFiles
+      ? loadedFiles.filter((file) => !isHiddenPath(resolveFileDiffPath(file)))
+      : loadedFiles;
+  const hiddenFileCount = loadedFiles.length - files.length;
   const filePaths = files.map((file) => resolveFileDiffPath(file));
   const omittedFileStats = new Map(
     loadedSlices.flatMap((slice) =>
@@ -1185,9 +1196,17 @@ function PullRequestCodeTab({
             {files.length} {files.length === 1 ? "file" : "files"}
             {nextCursor === null ? "" : "+"}
           </span>
-          {hiddenTestFileCount > 0 ? (
-            <Button type="button" size="xs" variant="link" onClick={() => setHideTestFiles(false)}>
-              {hiddenTestFileCount} test {hiddenTestFileCount === 1 ? "file" : "files"} hidden
+          {hiddenFileCount > 0 ? (
+            <Button
+              type="button"
+              size="xs"
+              variant="link"
+              onClick={() => {
+                setHideTestFiles(false);
+                setHideGeneratedFiles(false);
+              }}
+            >
+              {hiddenFileCount} {hiddenFileCount === 1 ? "file" : "files"} hidden
             </Button>
           ) : null}
           {filesViewed.enabled && files.length > 0 ? (
@@ -1420,6 +1439,26 @@ function PullRequestCodeTab({
             </TooltipTrigger>
             <TooltipPopup side="top">
               {hideTestFiles ? "Show test files" : "Hide test files"}
+            </TooltipPopup>
+          </Tooltip>
+        ) : null}
+        {generatedFileCount > 0 ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Toggle
+                  aria-label="Hide generated files"
+                  variant="ghost"
+                  size="sm"
+                  pressed={hideGeneratedFiles}
+                  onPressedChange={(pressed) => setHideGeneratedFiles(Boolean(pressed))}
+                />
+              }
+            >
+              <FileCogIcon className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipPopup side="top">
+              {hideGeneratedFiles ? "Show generated files" : "Hide generated files"}
             </TooltipPopup>
           </Tooltip>
         ) : null}
