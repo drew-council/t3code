@@ -1012,6 +1012,7 @@ const ConversationTimeline = memo(function ConversationTimeline({
     canOperateThread,
     onRespondToApproval,
     citationRequest: readyCitationRequest,
+    onCiteAssistantText,
     listRef,
     timestampFormat,
     routeThreadKey,
