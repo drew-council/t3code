@@ -316,6 +316,7 @@ function makeMutableServerSettingsService(
           Effect.map((subscription) => Stream.fromSubscription(subscription)),
         );
       },
+      setProjectRepositoryKeys: () => Effect.void,
     } satisfies ServerSettingsModule.ServerSettingsService["Service"];
   });
 }
@@ -3065,6 +3066,7 @@ it.layer(
             Stream.ensuring(Deferred.succeed(done, undefined)),
           );
         }),
+        setProjectRepositoryKeys: () => Effect.void,
       } satisfies ServerSettingsModule.ServerSettingsService["Service"];
       const dependencies = yield* Layer.build(
         Layer.mergeAll(
