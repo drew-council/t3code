@@ -11,6 +11,7 @@ import {
   type ReviewBranchCommitsResult,
   type ReviewDiffPreviewResult,
   type ReviewDiffPreviewSource,
+  type ReviewGeneratedPathsResult,
   type ScopedThreadRef,
   type VcsListRefsResult,
   type VcsStatusResult,
@@ -44,6 +45,7 @@ const state = vi.hoisted(() => ({
   commits: null as unknown as ResultAtom<ReviewBranchCommitsResult>,
   checkpoints: [] as unknown[],
   checkpointDiff: null as { diff: string } | null,
+  generatedPaths: null as unknown as ResultAtom<ReviewGeneratedPathsResult>,
 }));
 
 vi.mock("~/state/server", () => ({
@@ -56,6 +58,7 @@ vi.mock("~/state/review", () => ({
     branchCommits: () => state.commits,
     diffFilePatch: () => state.patch,
     diffFileContents: {},
+    generatedPaths: () => state.generatedPaths,
   },
 }));
 vi.mock("~/state/vcs", () => ({
@@ -196,6 +199,7 @@ function setup(failedBaseRef: string | null) {
   state.localRefs = Atom.make(AsyncResult.success(refs(["dev", "main"], false)));
   state.remoteRefs = Atom.make(AsyncResult.success(refs(["origin/orphan"], true)));
   state.commits = Atom.make(AsyncResult.success({ commits: [], truncated: false }));
+  state.generatedPaths = Atom.make(AsyncResult.success({ generated: {} }));
   useDiffPanelStore.getState().selectBranchBaseRef(state.threadRef, failedBaseRef);
   const registry = AtomRegistry.make();
   return {
