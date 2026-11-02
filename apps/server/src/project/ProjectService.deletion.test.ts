@@ -541,6 +541,7 @@ it.effect.each([
 
         const liveProjectId = ProjectId.make("project:still-live");
         const missingProjectId = ProjectId.make("project:missing");
+        const repositoryKey = ProjectId.make("github.com/acme/absent-here");
         yield* seedProject(liveProjectId);
         // Older deletions or interrupted best-effort cleanup can leave the original overrides on restart.
         yield* serverSettings.updateSettings({
@@ -552,11 +553,13 @@ it.effect.each([
             },
             [liveProjectId]: { defaultAutoPull: true },
             [missingProjectId]: { worktreeCleanup: { mode: "off" } },
+            [repositoryKey]: { defaultAutoPull: true },
           },
         });
         yield* ProjectSettingsOverrideSweep.sweep;
         assert.deepStrictEqual((yield* serverSettings.getSettings).projectSettingsOverrides, {
           [liveProjectId]: { defaultAutoPull: true },
+          [repositoryKey]: { defaultAutoPull: true },
           ...(worktreeCleanup === undefined
             ? {}
             : { [projectId]: { worktreeCleanup, providerInstances: {} } }),
