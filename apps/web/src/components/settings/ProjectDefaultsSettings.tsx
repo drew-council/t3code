@@ -108,6 +108,7 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
   const mixedAutoPull = useScopedSettingsMixed(["defaultAutoPull"]);
   const mixedAgentCredits = useScopedSettingsMixed(["removeAgentCreditsOnMerge"]);
   const mixedChainStacks = useScopedSettingsMixed(["registerPullRequestChainsAsStacks"]);
+  const mixedPullRequestList = useScopedSettingsMixed(["includeInPullRequestList"]);
   const mixedMergeMethod = useScopedSettingsMixed(["pullRequestMergeMethod"]);
   const modelSource = useScopedSettingSource(["defaultModelSelection"]);
   const isProjectScope = scope.kind === "project" || scope.kind === "checkout";
@@ -494,6 +495,34 @@ export function ProjectDefaultsSettings({ category }: { category: ProjectSetting
                 onCheckedChange={(enabled) =>
                   updateSettings({ registerPullRequestChainsAsStacks: enabled })
                 }
+              />
+            }
+          />
+          <SettingsRow
+            serverScoped
+            settingKeys={["includeInPullRequestList"]}
+            mixed={mixedPullRequestList}
+            {...searchableSetting("include-in-pull-request-list")}
+            description={
+              isProjectScope
+                ? "List this project's pull requests when Pull requests shows every project. Choosing the project in the list's filter still loads them."
+                : "List each project's pull requests when Pull requests shows every project. Turn off to save host API requests, then turn it on for the projects you follow. Choosing a project in the list's filter still loads it."
+            }
+            resetAction={
+              settings.includeInPullRequestList ? null : (
+                <SettingResetButton
+                  label="pull request listing"
+                  tooltip="List pull requests"
+                  onClick={() => updateSettings({ includeInPullRequestList: true })}
+                />
+              )
+            }
+            control={
+              <Switch
+                aria-label="Include in pull request list"
+                mixed={mixedPullRequestList}
+                checked={mixedPullRequestList ? false : settings.includeInPullRequestList}
+                onCheckedChange={(enabled) => updateSettings({ includeInPullRequestList: enabled })}
               />
             }
           />

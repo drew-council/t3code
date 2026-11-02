@@ -1045,6 +1045,7 @@ export const PROJECT_SCOPED_SERVER_SETTING_KEYS = [
   "sourceControlWritingStyle",
   "removeAgentCreditsOnMerge",
   "registerPullRequestChainsAsStacks",
+  "includeInPullRequestList",
   "branchNamingMode",
   "branchNamePrefix",
   "branchNameInstructions",
@@ -1083,6 +1084,7 @@ export const ProjectSettingsOverrides = Schema.Struct({
   sourceControlWritingStyle: Schema.optionalKey(SourceControlWritingStyleSetting),
   removeAgentCreditsOnMerge: Schema.optionalKey(Schema.Boolean),
   registerPullRequestChainsAsStacks: Schema.optionalKey(Schema.Boolean),
+  includeInPullRequestList: Schema.optionalKey(Schema.Boolean),
   branchNamingMode: Schema.optionalKey(BranchNamingMode),
   branchNamePrefix: Schema.optionalKey(TrimmedString),
   branchNameInstructions: Schema.optionalKey(TrimmedString),
@@ -1344,6 +1346,7 @@ export const ServerSettings = Schema.Struct({
   registerPullRequestChainsAsStacks: Schema.Boolean.pipe(
     Schema.withDecodingDefault(Effect.succeed(false)),
   ),
+  includeInPullRequestList: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   sourceControlWritingStyle: SourceControlWritingStyleSetting.pipe(
     Schema.withDecodingDefault(Effect.succeed({})),
   ),
@@ -1691,6 +1694,7 @@ export const ServerSettingsPatch = Schema.Struct({
   branchNameInstructions: Schema.optionalKey(TrimmedString),
   removeAgentCreditsOnMerge: Schema.optionalKey(Schema.Boolean),
   registerPullRequestChainsAsStacks: Schema.optionalKey(Schema.Boolean),
+  includeInPullRequestList: Schema.optionalKey(Schema.Boolean),
   sourceControlWritingStyle: Schema.optionalKey(
     Schema.Struct({
       mode: Schema.optionalKey(SourceControlWritingStyleMode),

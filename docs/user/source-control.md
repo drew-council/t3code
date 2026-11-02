@@ -176,6 +176,10 @@ to read its description, activity, commits, and changed files. Line comments sta
 until you submit the review. **Work on PR** opens a chat with the review attached; sending
 the first message prepares a worktree from the review's branch.
 
+With every project selected, **Pull requests** queries each project's host. To save API
+requests, turn off **Include in pull request list** in Settings → Source control, then turn it
+on for the projects you follow. Choosing a project in the list's filter still loads it.
+
 Previously loaded lists, review details, guides, and diff pages remain readable on mobile
 without a connection, including after restarting the app. Saved content refreshes when the
 environment reconnects; submitting changes requires a connection.

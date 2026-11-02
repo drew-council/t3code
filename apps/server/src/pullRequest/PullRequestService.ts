@@ -21,6 +21,7 @@ import {
   resolvePullRequestAuthorFilter,
   type OrchestrationProjectShell,
   type ProjectId,
+  type ServerSettingsError,
   type PullRequestAction,
   type PullRequestActionInput,
   type PullRequestActivity,
@@ -846,15 +847,17 @@ export const make = Effect.gen(function* () {
     ).pipe(Effect.map((resolved) => new Map(resolved)));
   });
 
+  // Browsing skips unlisted projects; routing and stats lookups must still find them.
   const listWorkspaceProjects = (
     filter: Pick<PullRequestListInput, "projectId" | "projectIds" | "host">,
+    scope: "all" | "listed" = "all",
   ): Effect.Effect<WorkspaceProjects, PullRequestError> =>
     Effect.flatMap(sharedProjectReads, (shared) => {
-      if (shared === null || !shared.open) return readWorkspaceProjects(filter);
-      const key = JSON.stringify([filter.projectId, filter.projectIds, filter.host]);
+      if (shared === null || !shared.open) return readWorkspaceProjects(filter, scope);
+      const key = JSON.stringify([filter.projectId, filter.projectIds, filter.host, scope]);
       const existing = shared.reads.get(key);
       if (existing !== undefined) return existing;
-      return Effect.cached(readWorkspaceProjects(filter)).pipe(
+      return Effect.cached(readWorkspaceProjects(filter, scope)).pipe(
         Effect.tap((read) => Effect.sync(() => shared.reads.set(key, read))),
         Effect.flatten,
       );
@@ -876,13 +879,25 @@ export const make = Effect.gen(function* () {
 
   const readWorkspaceProjects = (
     filter: Pick<PullRequestListInput, "projectId" | "projectIds" | "host">,
-  ): Effect.Effect<WorkspaceProjects, PullRequestError> =>
-    (filter.projectId === undefined
-      ? projects.listShells(
-          filter.projectIds === undefined ? undefined : { projectIds: filter.projectIds },
-        )
-      : projects.getShell(filter.projectId).pipe(Effect.map(Option.toArray))
-    ).pipe(
+    scope: "all" | "listed",
+  ): Effect.Effect<WorkspaceProjects, PullRequestError> => {
+    const shells = projects.listShells(
+      filter.projectIds === undefined ? undefined : { projectIds: filter.projectIds },
+    );
+    const selected: Effect.Effect<
+      ReadonlyArray<OrchestrationProjectShell>,
+      ProjectService.ProjectOperationError | ServerSettingsError
+    > = filter.projectId !== undefined
+      ? projects.getShell(filter.projectId).pipe(Effect.map(Option.toArray))
+      : scope === "listed"
+        ? Effect.zipWith(shells, serverSettings.getSettings, (all, settings) =>
+            all.filter(
+              (project) =>
+                resolveProjectSettings(settings, project.id).settings.includeInPullRequestList,
+            ),
+          )
+        : shells;
+    return selected.pipe(
       Effect.mapError(
         (error) =>
           new PullRequestOperationError({
@@ -971,6 +986,7 @@ export const make = Effect.gen(function* () {
         return { supported, unimplemented, viewerRoots };
       }),
     );
+  };
 
   // Azure derives organization from the checkout; require the matching repository.
   const requireProject = (ref: PullRequestRef): Effect.Effect<SupportedProject, PullRequestError> =>
@@ -1272,7 +1288,11 @@ export const make = Effect.gen(function* () {
   )(function* (input) {
     const involvement = input.involvement ?? "all";
     const continuation = yield* decodeCursors(input.cursors);
-    const { supported: projects, unimplemented, viewerRoots } = yield* listWorkspaceProjects(input);
+    const {
+      supported: projects,
+      unimplemented,
+      viewerRoots,
+    } = yield* listWorkspaceProjects(input, "listed");
     const projectCounts = new Map<string, number>();
     for (const { host } of projects) {
       projectCounts.set(host, (projectCounts.get(host) ?? 0) + 1);
@@ -2513,7 +2533,7 @@ export const make = Effect.gen(function* () {
   const filterOptions: PullRequestService["Service"]["filterOptions"] = Effect.fn(
     "PullRequestService.filterOptions",
   )(function* (input) {
-    const { supported } = yield* listWorkspaceProjects(input);
+    const { supported } = yield* listWorkspaceProjects(input, "listed");
     // Worktrees of one checkout are separate projects over the same repository.
     const repositories = [
       ...new Map(supported.map((project) => [project.cursorKey, project])).values(),
