@@ -968,6 +968,15 @@ export const SETTINGS_SEARCH_ITEMS = [
     ],
   },
   {
+    id: "include-in-pull-request-list",
+    title: "Include in pull request list",
+    to: "/settings/source-control",
+    scope: "project-defaults",
+    searchTerms: [
+      `pull request ${SOURCE_CONTROL_HOST_LABELS} list index hide exclude rate limit api projects`,
+    ],
+  },
+  {
     id: "remove-agent-credits-on-merge",
     title: "Remove agent credits when merging",
     to: "/settings/source-control",

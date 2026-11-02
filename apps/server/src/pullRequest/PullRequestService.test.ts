@@ -669,6 +669,36 @@ it.effect("keeps the earlier exclusions when a slice ends on the instant it bega
   }),
 );
 
+it.effect("lists only included projects unless the request names one", () =>
+  Effect.gen(function* () {
+    const reads: Array<string> = [];
+    const service = yield* makeService({
+      settings: {
+        ...DEFAULT_SERVER_SETTINGS,
+        includeInPullRequestList: false,
+        projectSettingsOverrides: { ["p1" as ProjectId]: { includeInPullRequestList: true } },
+      },
+      projects: [
+        project({ id: "p1", title: "web", workspaceRoot: "/a", repository: "acme/web" }),
+        project({ id: "p2", title: "api", workspaceRoot: "/b", repository: "acme/api" }),
+      ],
+      providers: [
+        fakePullRequestProvider(SourceControlProviderKind.make("github"), {
+          listChangeRequests: (input) => {
+            reads.push(input.repository);
+            return Effect.succeed({ items: [], truncated: false, continues: false });
+          },
+        }),
+      ],
+    });
+
+    yield* service.list({ state: "open" });
+    assert.deepStrictEqual(reads, ["acme/web"]);
+    yield* service.list({ state: "open", projectId: "p2" as ProjectId });
+    assert.deepStrictEqual(reads, ["acme/web", "acme/api"]);
+  }),
+);
+
 it.effect("calls a transient viewer failure a failed operation, not a signed-out CLI", () =>
   Effect.gen(function* () {
     const service = yield* makeService({
