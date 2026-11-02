@@ -278,6 +278,11 @@ export class ServerSettingsService extends Context.Service<
 
     /** Subscribe before reading a snapshot to retain changes before lazy stream startup. */
     readonly subscribeChanges: Effect.Effect<Stream.Stream<ServerSettings>, never, Scope.Scope>;
+
+    /** Maps live projects to repository canonical keys so shared override entries apply. */
+    readonly setProjectRepositoryKeys: (
+      keys: ReadonlyMap<ProjectId, string>,
+    ) => Effect.Effect<void, ServerSettingsError>;
   }
 >()("t3/serverSettings/ServerSettingsService") {
   static readonly layerTest = (
@@ -338,6 +343,7 @@ const makeTest = Effect.fn("serverSettings.makeTest")(function* (
     withSettingsSnapshot: (use) =>
       writeSemaphore.withPermits(1)(getSettings.pipe(Effect.flatMap(use))),
     streamChanges: Stream.empty,
+    setProjectRepositoryKeys: () => Effect.void,
     subscribeChanges: Effect.succeed(Stream.empty),
   } satisfies ServerSettingsService["Service"];
 });
@@ -536,6 +542,25 @@ function fallbackTextGenerationProvider(
     { defaultModelSelection: settings.defaultModelSelection },
   );
   return fallback === null ? settings : { ...settings, textGenerationModelSelection: fallback };
+}
+
+/** Repository canonical keys (`github.com/owner/repo`) contain a slash; project IDs never do. */
+export const isRepositoryOverrideKey = (key: string): boolean => key.includes("/");
+
+/** Layers each project's repository entry under its own entry, which wins per field. */
+function applyRepositoryOverrides(
+  settings: ServerSettings,
+  keys: ReadonlyMap<ProjectId, string>,
+): ServerSettings {
+  const overrides = settings.projectSettingsOverrides;
+  let next: Record<ProjectId, ProjectSettingsOverrides> | null = null;
+  for (const [projectId, key] of keys) {
+    const shared = overrides[key as ProjectId];
+    if (shared === undefined) continue;
+    next ??= { ...overrides };
+    next[projectId] = { ...shared, ...overrides[projectId] };
+  }
+  return next === null ? settings : { ...settings, projectSettingsOverrides: next };
 }
 
 const ATOMIC_SETTINGS_KEYS: ReadonlySet<string> = new Set([
@@ -979,6 +1004,9 @@ const make = Effect.gen(function* () {
   let materialized: { readonly source: ServerSettings; readonly value: ServerSettings } | null =
     null;
   let secretWriteGeneration = 0;
+  let projectRepositoryKeys: ReadonlyMap<ProjectId, string> = new Map();
+  const resolveSettings = (settings: ServerSettings) =>
+    toEffective(applyRepositoryOverrides(settings, projectRepositoryKeys));
   const invalidateMaterialized = Effect.sync(() => {
     secretWriteGeneration++;
     materialized = null;
@@ -988,7 +1016,7 @@ const make = Effect.gen(function* () {
       if (materialized?.source === source) return Effect.succeed(materialized.value);
       const generation = secretWriteGeneration;
       return materializeSettingsSecrets(source).pipe(
-        Effect.map(toEffective),
+        Effect.map(resolveSettings),
         Effect.tap((value) =>
           Effect.sync(() => {
             if (generation === secretWriteGeneration) materialized = { source, value };
@@ -1012,7 +1040,7 @@ const make = Effect.gen(function* () {
           ),
         ),
       ),
-      Stream.map(toEffective),
+      Stream.map(resolveSettings),
     );
 
   type SecretChange = {
@@ -1220,7 +1248,7 @@ const make = Effect.gen(function* () {
           }).pipe(Effect.ensuring(invalidateMaterialized)),
         );
         yield* Cache.set(settingsCache, cacheKey, { settings: next, parseFailure: Option.none() });
-        const resolved = toEffective(materializedNext);
+        const resolved = resolveSettings(materializedNext);
         materialized = { source: next, value: resolved };
         yield* emitChange(next);
         return resolved;
@@ -1359,6 +1387,23 @@ const make = Effect.gen(function* () {
         Effect.map((subscription) => materializeChanges(Stream.fromSubscription(subscription))),
       );
     },
+    setProjectRepositoryKeys: Effect.fn("ServerSettingsService.setProjectRepositoryKeys")(
+      function* (keys) {
+        const previous = projectRepositoryKeys;
+        if (
+          keys.size === previous.size &&
+          [...keys].every(([projectId, key]) => previous.get(projectId) === key)
+        ) {
+          return;
+        }
+        projectRepositoryKeys = keys;
+        yield* invalidateMaterialized;
+        const current = yield* getSettingsFromCache;
+        if (Object.keys(current.projectSettingsOverrides).some(isRepositoryOverrideKey)) {
+          yield* emitChange(current);
+        }
+      },
+    ),
   } satisfies ServerSettingsService["Service"];
 });
 

@@ -651,6 +651,7 @@ const makeHarness = Effect.fn("makeThreadSettlementHarness")(function* (options:
     subscribeChanges: PubSub.subscribe(settingsChanges).pipe(
       Effect.map((subscription) => Stream.fromSubscription(subscription)),
     ),
+    setProjectRepositoryKeys: () => Effect.void,
   });
 
   const layerDependencies = Layer.mergeAll(
