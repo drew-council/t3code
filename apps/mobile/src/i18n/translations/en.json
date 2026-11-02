@@ -3640,6 +3640,8 @@
   "88631d9ea293eccd": "Remove recognized agent credits from merge and squash messages on hosts that support it, keeping human co-authors. Includes auto-merge. Excludes merge queues, stack merges, and existing commits.",
   "57b7f33c7362b0c3": "Register pull request chains as stacks",
   "08c67ce52d486325": "Register a chain of linked pull requests, each based on the one below it, as a stack on hosts that support stacks, so reviewers see it there. Adds only; existing stacks are left alone.",
+  "3f182e9884d84689": "Include in pull request list",
+  "2e11c098fd3c38e1": "List pull requests when Pull requests shows every project. Turn off to save host API requests. Choosing the project in the list's filter still loads it.",
   "15ed472fb3ba4a6d": "Default branch",
   "abe5615aea30066d": "Automatically pull",
   "17782375efd2c928": "Keep the default branch current when there are no local changes.",

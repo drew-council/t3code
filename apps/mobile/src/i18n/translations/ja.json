@@ -3631,6 +3631,8 @@
   "88631d9ea293eccd": "対応しているホストでは、マージとスカッシュのメッセージから認識されたエージェントのクレジットを削除し、人間の共同作成者は残します。自動マージにも適用されます。マージキュー、スタックのマージ、既存のコミットは対象外です。",
   "57b7f33c7362b0c3": "Register pull request chains as stacks",
   "08c67ce52d486325": "Register a chain of linked pull requests, each based on the one below it, as a stack on hosts that support stacks, so reviewers see it there. Adds only; existing stacks are left alone.",
+  "3f182e9884d84689": "Include in pull request list",
+  "2e11c098fd3c38e1": "List pull requests when Pull requests shows every project. Turn off to save host API requests. Choosing the project in the list's filter still loads it.",
   "15ed472fb3ba4a6d": "デフォルトブランチ",
   "abe5615aea30066d": "自動的にプル",
   "17782375efd2c928": "ローカルの変更がない場合、デフォルトブランチを最新に保ちます。",

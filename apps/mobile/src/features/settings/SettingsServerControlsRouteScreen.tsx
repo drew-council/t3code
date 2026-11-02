@@ -68,6 +68,7 @@ const PAGE_PROJECT_KEYS: Record<SettingsPage, readonly ProjectScopedServerSettin
     "defaultAutoPull",
     "removeAgentCreditsOnMerge",
     "registerPullRequestChainsAsStacks",
+    "includeInPullRequestList",
   ],
   worktrees: [
     "newWorktreesStartFromOrigin",
@@ -450,6 +451,19 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                     value={uniform("registerPullRequestChainsAsStacks")}
                     disabled={disabledFor("registerPullRequestChainsAsStacks")}
                     onValueChange={(value) => write({ registerPullRequestChainsAsStacks: value })}
+                  />
+                  <SettingsSwitchRow
+                    icon={PullRequestGlyph.pullRequest}
+                    label={gt("Include in pull request list")}
+                    subtitle={managedSubtitle(
+                      "includeInPullRequestList",
+                      gt(
+                        "List pull requests when Pull requests shows every project. Turn off to save host API requests. Choosing the project in the list's filter still loads it.",
+                      ),
+                    )}
+                    value={uniform("includeInPullRequestList")}
+                    disabled={disabledFor("includeInPullRequestList")}
+                    onValueChange={(value) => write({ includeInPullRequestList: value })}
                   />
                 </SettingsSection>
                 <SettingsSection title={gt("Default branch")}>
