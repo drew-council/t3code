@@ -57,6 +57,19 @@ const PI_PRESENTATION = {
   reportsContextWindow: true,
 } as const;
 
+const piPresentation = (piSettings: PiSettings) =>
+  piSettings.autoUsesExtensionReview
+    ? {
+        ...PI_PRESENTATION,
+        supportedRuntimeModes: [
+          "approval-required",
+          "auto-accept-edits",
+          "auto",
+          "full-access",
+        ] as const,
+      }
+    : PI_PRESENTATION;
+
 const VERSION_PROBE_TIMEOUT_MS = 10_000;
 const PI_RPC_DISCOVERY_TIMEOUT_MS = 30_000;
 /**
@@ -300,7 +313,7 @@ export const buildInitialPiProviderSnapshot = Effect.fn(
   const models = piModelsFromSettings(piSettings.customModels);
   if (!piSettings.enabled) {
     return buildServerProvider({
-      presentation: PI_PRESENTATION,
+      presentation: piPresentation(piSettings),
       enabled: false,
       checkedAt,
       models,
@@ -314,7 +327,7 @@ export const buildInitialPiProviderSnapshot = Effect.fn(
     });
   }
   return buildServerProvider({
-    presentation: PI_PRESENTATION,
+    presentation: piPresentation(piSettings),
     enabled: true,
     checkedAt,
     models,
@@ -338,7 +351,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
 
   if (!piSettings.enabled) {
     return buildServerProvider({
-      presentation: PI_PRESENTATION,
+      presentation: piPresentation(piSettings),
       enabled: false,
       checkedAt,
       models: fallbackModels,
@@ -361,7 +374,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
     const error = versionResult.failure;
     yield* Effect.logWarning("Pi CLI health check failed.", { errorTag: error._tag });
     return buildServerProvider({
-      presentation: PI_PRESENTATION,
+      presentation: piPresentation(piSettings),
       enabled: piSettings.enabled,
       checkedAt,
       models: fallbackModels,
@@ -379,7 +392,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
 
   if (Option.isNone(versionResult.success)) {
     return buildServerProvider({
-      presentation: PI_PRESENTATION,
+      presentation: piPresentation(piSettings),
       enabled: piSettings.enabled,
       checkedAt,
       models: fallbackModels,
@@ -397,7 +410,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
   const version = parseGenericCliVersion(`${versionOutput.stdout}\n${versionOutput.stderr}`);
   if (versionOutput.code !== 0) {
     return buildServerProvider({
-      presentation: PI_PRESENTATION,
+      presentation: piPresentation(piSettings),
       enabled: piSettings.enabled,
       checkedAt,
       models: fallbackModels,
@@ -413,7 +426,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
 
   if (version === null) {
     return buildServerProvider({
-      presentation: PI_PRESENTATION,
+      presentation: piPresentation(piSettings),
       enabled: piSettings.enabled,
       checkedAt,
       models: fallbackModels,
@@ -429,7 +442,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
 
   if (compareSemverVersions(version, MINIMUM_PI_VERSION) < 0) {
     return buildServerProvider({
-      presentation: PI_PRESENTATION,
+      presentation: piPresentation(piSettings),
       enabled: piSettings.enabled,
       checkedAt,
       models: fallbackModels,
@@ -446,7 +459,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
   const resolvedLaunchArgs = resolvePiLaunchArgs(piSettings.launchArgs);
   if (!resolvedLaunchArgs.ok) {
     return buildServerProvider({
-      presentation: PI_PRESENTATION,
+      presentation: piPresentation(piSettings),
       enabled: piSettings.enabled,
       checkedAt,
       models: fallbackModels,
@@ -471,7 +484,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
       errorTag: causeErrorTag(discoveryExit.cause),
     });
     return buildServerProvider({
-      presentation: PI_PRESENTATION,
+      presentation: piPresentation(piSettings),
       enabled: piSettings.enabled,
       checkedAt,
       models: fallbackModels,
@@ -487,7 +500,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
   }
   if (Option.isNone(discoveryExit.value)) {
     return buildServerProvider({
-      presentation: PI_PRESENTATION,
+      presentation: piPresentation(piSettings),
       enabled: piSettings.enabled,
       checkedAt,
       models: fallbackModels,
@@ -516,7 +529,7 @@ export const checkPiProviderStatus = Effect.fn("checkPiProviderStatus")(function
           discovery.unavailableActiveModel,
         );
   return buildServerProvider({
-    presentation: PI_PRESENTATION,
+    presentation: piPresentation(piSettings),
     enabled: piSettings.enabled,
     checkedAt,
     models,

@@ -250,6 +250,8 @@ export function buildPiRpcLaunch(input: {
   readonly disableExtensions?: boolean;
   readonly disableTools?: boolean;
   readonly runtimeMode?: "approval-required" | "auto-accept-edits" | "auto" | "full-access";
+  /** Auto defers to the user's Pi extensions instead of T3 Code prompts. */
+  readonly autoUsesExtensionReview?: boolean;
 }): {
   readonly args: ReadonlyArray<string>;
   readonly env: NodeJS.ProcessEnv;
@@ -299,7 +301,11 @@ export function buildPiRpcLaunch(input: {
       ...(hasT3Extension && input.runtimeMode !== undefined
         ? {
             [T3_PI_RUNTIME_MODE_ENV]:
-              input.runtimeMode === "auto" ? "approval-required" : input.runtimeMode,
+              input.runtimeMode === "auto"
+                ? input.autoUsesExtensionReview === true
+                  ? "full-access"
+                  : "approval-required"
+                : input.runtimeMode,
           }
         : {}),
       ...(hasT3Mcp && input.mcpSession !== undefined
