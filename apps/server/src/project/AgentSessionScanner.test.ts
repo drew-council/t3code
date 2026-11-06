@@ -1932,7 +1932,8 @@ describe.skipIf(HostProcess.Platform.defaultValue() === "win32")(
         }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
     );
 
-    it.effect("still reads the git identity of repositories next to a blocked one", () =>
+    // Advancing a TestClock would also time out the unblocked reads still in flight.
+    it.live("still reads the git identity of repositories next to a blocked one", () =>
       Effect.gen(function* () {
         const path = yield* Path.Path;
         const fileSystem = yield* FileSystem.FileSystem;
@@ -1960,14 +1961,7 @@ describe.skipIf(HostProcess.Platform.defaultValue() === "win32")(
         }
 
         for (let attempt = 1; attempt <= 2; attempt++) {
-          const scan = yield* Effect.forkChild(runScan({ claudeHomePath, codexHomePath }));
-          const result = yield* Effect.scoped(
-            Effect.gen(function* () {
-              yield* awaitGateReader(path.join(repos[1], ".git", "config"));
-              yield* TestClock.adjust("2 seconds");
-              return yield* Fiber.join(scan);
-            }),
-          );
+          const result = yield* runScan({ claudeHomePath, codexHomePath });
           expect(
             result.candidates.map((candidate) => ({ path: candidate.path, git: candidate.git })),
             `scan ${attempt}`,
