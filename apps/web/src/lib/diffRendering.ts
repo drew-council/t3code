@@ -6,7 +6,7 @@ import { READABLE_LIGHT_THEME_NAME } from "./readableSyntaxTheme";
 // Light mode uses a darker pierre-light so syntax stays readable on every code surface.
 export const DIFF_THEME_NAMES = {
   light: READABLE_LIGHT_THEME_NAME,
-  dark: "pierre-dark",
+  dark: "catppuccin-mocha",
 } as const;
 
 export type DiffThemeName = (typeof DIFF_THEME_NAMES)[keyof typeof DIFF_THEME_NAMES];
