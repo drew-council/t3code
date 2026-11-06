@@ -5,6 +5,7 @@ import { remoteCacheUrl } from "./infra/task-cache/src/remoteCache.ts";
 import { cachedTestTasks } from "./scripts/lib/cached-tests.ts";
 
 const TEST_EXCLUDE = [
+  "**/.direnv/**",
   "**/.repos/**",
   "**/.t3/**",
   "**/node_modules/**",
