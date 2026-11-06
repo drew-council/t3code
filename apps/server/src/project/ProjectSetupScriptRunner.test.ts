@@ -122,6 +122,19 @@ describe("ProjectSetupScriptRunner", () => {
     }),
   );
 
+  it.effect("types Nushell completion syntax once its line editor starts", () =>
+    Effect.gen(function* () {
+      const { writes, emit } = yield* setup({ shell: "/usr/bin/nu" });
+      yield* TestClock.adjust("1 second");
+      expect(yield* Queue.size(writes)).toBe(0);
+
+      yield* emit({ ...event, type: "output", data: "\x1b[?2004h" });
+      expect(yield* Queue.take(writes)).toMatch(
+        /^ let __t3c = try \{\rvp i\r0 \} catch \{.*\}; print \$"\\n__T3_SETUP_DONE___\w+:\(\$__t3c\)"\r$/,
+      );
+    }),
+  );
+
   it.effect("shows a startup prompt and types only once the line editor starts", () =>
     Effect.gen(function* () {
       const { result, writes, outputLines, emit } = yield* setup();
