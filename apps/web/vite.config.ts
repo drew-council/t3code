@@ -101,6 +101,7 @@ const unitTestProject = {
   },
 } satisfies TestProjectInlineConfiguration;
 
+const testChromiumPath = process.env.T3CODE_TEST_CHROMIUM_PATH;
 // Hash checkout paths to ports 20000-23999; Vitest's fixed port collides under inherited strictPort.
 // Stay below ephemeral ranges: Windows reserves Hyper-V/WSL blocks there and EACCES is not skipped.
 const browserTestApiPort = 20_000 + ((Hash.string(import.meta.dirname) >>> 0) % 4_000);
@@ -141,7 +142,9 @@ const browserTestProject = {
     browser: {
       enabled: true,
       headless: true,
-      provider: playwright(),
+      provider: playwright(
+        testChromiumPath ? { launchOptions: { executablePath: testChromiumPath } } : {},
+      ),
       instances: [{ browser: "chromium" }],
       screenshotFailures: false,
       commands: {
