@@ -36,18 +36,25 @@
       });
 
       devShells = forAllSystems (pkgs: {
-        default = pkgs.mkShell {
-          packages = with pkgs; [
-            (aspellWithDicts (ps: with ps; [ en ]))
-            nushell
-            nodejs_26
-            pnpm_12
-            python3
-            cargo
-            rustc
-            gh
-          ];
-        };
+        default = pkgs.mkShell (
+          {
+            packages = with pkgs; [
+              (aspellWithDicts (ps: with ps; [ en ]))
+              nushell
+              nodejs_26
+              pnpm_12
+              python3
+              cargo
+              rustc
+              gh
+            ];
+          }
+          # Playwright's downloaded browsers cannot run on NixOS, and nixpkgs' playwright-driver
+          # ships other revisions than the pinned Playwright expects.
+          // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+            T3CODE_TEST_CHROMIUM_PATH = lib.getExe pkgs.chromium;
+          }
+        );
       });
     };
 }
